@@ -26,7 +26,7 @@ Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
 "Allocate `sizeof(T)` bytes for an unintialized Paged{T}"
 Paged{T}() where {T} = Paged{T}(sizeof(T))
 
-function replace_dots(expr)
+function rewrite_address(expr)
     if !(expr isa Expr)
         esc(expr)
     elseif expr.head == :.
@@ -38,52 +38,58 @@ function replace_dots(expr)
         else
             error("Impossible?")
         end
-        :(getproperty($(replace_dots(object)), $(Val{fieldname})))
-    else
-        error("Don't know how to rewrite $expr")
-    end
-end
-
-function _paged(expr)
-    if expr.head == :.
-        # p.x.y
-        replace_dots(expr)
+        :(get_address($(rewrite_address(object)), $(Val{fieldname})))
     elseif expr.head == :ref
-        # p.x.y[]
-        @assert length(expr.args) == 1
-        Expr(:ref, replace_dots(expr.args[1]))
-    elseif (expr.head == :(=)) && (expr.args[1].head == :ref)
-        # p.x.y[] = ...
-        @assert length(expr.args[1].args) == 1
-        Expr(:(=), Expr(:ref, replace_dots(expr.args[1].args[1])), esc(expr.args[2]))
+        object = expr.args[1]
+        :(get_address($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
     else
-        error("Don't know how to rewrite $expr")
+        error("Don't know how to compute address for $expr")
     end
 end
 
 """
-Syntactic sugar for accessing fields of `Paged{T}`.
+    @a paged.x[2].y
 
-    @paged p.x.y
-
-Return a `Paged` pointing at `p.x.y`
-
-    @paged p.x.y[]
-
-Return a copy of the value of `p.x.y`
-
-    @paged p.x.y[] = z
-
-Write a copy of `z` into `p.x.y`
-
-(This syntax will be supported without needing a macro in Julia 0.7)
+Get a `Paged` pointing at the *address* of `paged.x[2].y`.
 """
-macro paged(expr)
-    _paged(expr)
+macro a(expr)
+    rewrite_address(expr)
 end
 
-# @paged turns `p.x` into `getproperty(p, Val{x})`
-@generated function getproperty(paged::Paged{T}, ::Type{Val{field}}) where {T, field}
+function rewrite_value(expr)
+    if (expr isa Expr) && (expr.head == :(=))
+        if length(expr.args) == 2
+            :(unsafe_store!($(rewrite_address(expr.args[1])), $(esc(expr.args[2]))))
+        else
+            error("Don't know how to compute assignment $expr")
+        end
+    else
+        :(unsafe_load($(rewrite_address(expr))))
+    end
+end
+
+"""
+    @v paged.x[2].y
+
+Get the *value* at `paged.x[2].y`.
+
+    @v paged.x[2].y = 42
+
+Set the *value* at `paged.x[2].y`.
+
+NOTE macros bind tightly, so:
+
+    # invalid syntax
+    @v paged.x[2].y < 42
+
+    # valid syntax
+    (@v paged.x[2].y) < 42
+"""
+macro v(expr)
+    rewrite_value(expr)
+end
+
+@generated function get_address(paged::Paged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0
     quote
@@ -92,11 +98,7 @@ end
     end
 end
 
-# tell the autocomplete about this
-propertynames(::Type{Paged{T}}) where {T} = fieldnames(T)
-
-# can read from a Paged{T} using the syntax p[]
-@generated function Base.getindex(paged::Paged{T}) where {T}
+@generated function Base.unsafe_load(paged::Paged{T}) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
@@ -108,13 +110,13 @@ propertynames(::Type{Paged{T}}) where {T} = fieldnames(T)
         # so that specializations of this method can hook in and alter loading
         $(Expr(:meta, :inline))
         Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-            getindex(getproperty(paged, $(Val{field})))
+            unsafe_load(get_address(paged, $(Val{field})))
         end)
     end
 end
 
 # can write to a Paged{T} using the syntax p[] = ...
-@generated function Base.setindex!(paged::Paged{T}, value::T) where {T}
+@generated function Base.unsafe_store!(paged::Paged{T}, value::T) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
@@ -127,32 +129,32 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                setindex!(getproperty(paged, $(Val{field})), value.$field)
+                unsafe_store!(get_address(paged, $(Val{field})), value.$field)
             end)
         end
     end
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-@inline function Base.setindex!(paged::Paged{T}, value) where {T}
-    setindex!(paged, convert(T, value))
+@inline function Base.unsafe_store!(paged::Paged{T}, value) where {T}
+    unsafe_store!(paged, convert(T, value))
 end
 
 # pointers to other parts of the page need to be converted into offsets
 
-@inline function Base.getindex(paged::Paged{Paged{T}}) where {T}
-    offset = getindex(Paged{UInt64}(paged.ptr))
+@inline function Base.unsafe_load(paged::Paged{Paged{T}}) where {T}
+    offset = unsafe_load(Paged{UInt64}(paged.ptr))
     Paged{T}(paged.ptr + offset)
 end
 
-@inline function Base.setindex!(paged::Paged{Paged{T}}, value::Paged{T}) where {T}
+@inline function Base.unsafe_store!(paged::Paged{Paged{T}}, value::Paged{T}) where {T}
     offset = value.ptr - paged.ptr
-    setindex!(Paged{UInt64}(paged.ptr), offset)
+    unsafe_store!(Paged{UInt64}(paged.ptr), offset)
 end
 
 include("paged_vectors.jl")
 include("paged_bit_vectors.jl")
 
-export Paged, PagedVector, PagedBitVector, @paged
+export Paged, PagedVector, PagedBitVector, @a, @v
 
 end
