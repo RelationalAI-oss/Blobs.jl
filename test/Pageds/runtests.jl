@@ -103,6 +103,7 @@ p = PagedString(s)
 @test String(p) == s
 
 # test right-to-left
+
 s = "سلام"
 p = PagedString(s)
 @test isbits(p)
