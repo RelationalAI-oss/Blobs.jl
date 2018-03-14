@@ -109,8 +109,8 @@ p = PagedString(s)
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
-@test search(p, "通") == search(s, "通")
-@test rsearch(p, "通") == rsearch(s, "通")
+@test search(p, "ا") == search(s, "ا")
+@test rsearch(p, "ا") == rsearch(s, "ا")
 @test reverse(p) == reverse(s)
 @test reverse(p) isa RevString{PagedString}
 @test String(p) isa String
