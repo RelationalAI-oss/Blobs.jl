@@ -154,7 +154,8 @@ end
 
 include("paged_vectors.jl")
 include("paged_bit_vectors.jl")
+include("paged_strings.jl")
 
-export Paged, PagedVector, PagedBitVector, @a, @v
+export Paged, PagedVector, PagedBitVector, PagedString, @a, @v
 
 end

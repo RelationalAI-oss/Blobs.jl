@@ -86,3 +86,18 @@ pma2 = @a pma.mask[2]
 @v pma2 = true
 @test (@v pma2) == true
 @test (@v pma.mask[2]) == true
+
+# strings and unicode
+
+s = "普通话/普通話"
+p = PagedString(s)
+@test isbits(p)
+@test p == s
+@test repr(p) == repr(s)
+@test collect(p) == collect(s)
+@test search(p, "通") == search(s, "通")
+@test rsearch(p, "通") == rsearch(s, "通")
+@test reverse(p) == reverse(s)
+@test reverse(p) isa RevString{PagedString}
+@test String(p) isa String
+@test String(p) == s
