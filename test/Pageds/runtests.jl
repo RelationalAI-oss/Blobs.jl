@@ -91,28 +91,28 @@ pma2 = @a pma.mask[2]
 
 s = "普通话/普通話"
 p = PagedString(s)
-@test isbits(p)
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
 @test search(p, "通") == search(s, "通")
 @test rsearch(p, "通") == rsearch(s, "通")
 @test reverse(p) == reverse(s)
-@test reverse(p) isa RevString{PagedString}
-@test String(p) isa String
-@test String(p) == s
 
 # test right-to-left
 
 s = "سلام"
 p = PagedString(s)
-@test isbits(p)
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
 @test search(p, "ا") == search(s, "ا")
 @test rsearch(p, "ا") == rsearch(s, "ا")
 @test reverse(p) == reverse(s)
+
+# test string conversions
+
+@test isbits(p)
 @test reverse(p) isa RevString{PagedString}
 @test String(p) isa String
 @test String(p) == s
+@test string(p) isa String
