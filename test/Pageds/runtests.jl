@@ -53,39 +53,39 @@ pbv2 = @a pbv[2]
 
 # sketch of paged pmas
 
-struct PackedMemoryArray{K,V}
-     keys::PagedVector{K}
-     values::PagedVector{V}
-     mask::PagedBitVector
-     count::Int
-     #...other stuff
-end
-
-function Paged{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
-    size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V) + Int64(ceil(length/8))
-    ptr = Libc.malloc(size)
-    pma = Paged{PackedMemoryArray{K,V}}(ptr)
-    @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-    @v pma.values = PagedVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
-    @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
-    fill!((@v pma.mask), false)
-    @v pma.count = 0
-    pma
-end
-
-pma = Paged{PackedMemoryArray{Int64, Float32}}(3)
-@test (@v pma.count) == 0
-@test (@v pma.keys.length) == 3
-# tests fill!
-@test !any(@v pma.mask)
-# tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{UInt64}, pma.ptr), 1) == sizeof(PackedMemoryArray{Int64, Float32})
-# tests nested interior pointers
-pma2 = @a pma.mask[2]
-@test (@v pma2) == false
-@v pma2 = true
-@test (@v pma2) == true
-@test (@v pma.mask[2]) == true
+# struct PackedMemoryArray{K,V}
+#      keys::PagedVector{K}
+#      values::PagedVector{V}
+#      mask::PagedBitVector
+#      count::Int
+#      #...other stuff
+# end
+#
+# function Paged{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
+#     size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V) + Int64(ceil(length/8))
+#     ptr = Libc.malloc(size)
+#     pma = Paged{PackedMemoryArray{K,V}}(ptr)
+#     @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
+#     @v pma.values = PagedVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
+#     @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
+#     fill!((@v pma.mask), false)
+#     @v pma.count = 0
+#     pma
+# end
+#
+# pma = Paged{PackedMemoryArray{Int64, Float32}}(4)
+# @test (@v pma.count) == 0
+# @test (@v pma.keys.length) == 3
+# # tests fill!
+# @test !any(@v pma.mask)
+# # tests pointer <-> offset conversion
+# @test unsafe_load(convert(Ptr{UInt64}, pma.ptr), 1) == sizeof(PackedMemoryArray{Int64, Float32})
+# # tests nested interior pointers
+# pma2 = @a pma.mask[2]
+# @test (@v pma2) == false
+# @v pma2 = true
+# @test (@v pma2) == true
+# @test (@v pma.mask[2]) == true
 
 # strings and unicode
 
@@ -116,3 +116,5 @@ p = PagedString(s)
 @test String(p) isa String
 @test String(p) == s
 @test string(p) isa String
+
+include("test_packed_memory_array.jl")

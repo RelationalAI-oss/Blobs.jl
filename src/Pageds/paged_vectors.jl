@@ -20,7 +20,7 @@ function PagedVector{T}(length::Int64) where {T}
 end
 
 @inline function get_address(pv::PagedVector{T}, i::Int) where {T}
-    @assert i <= pv.length # TODO bounds check
+    (0 < i <= pv.length) || throw(BoundsError(pv, i))
     Paged{T}(pv.ptr.ptr + (i-1)*sizeof(T))
 end
 
@@ -44,4 +44,14 @@ end
 
 function Base.IndexStyle(_::Type{PagedVector{T}}) where {T}
     Base.IndexLinear()
+end
+
+# copying, with correct handling of overlapping regions
+function Base.copy!(dest::PagedVector{T}, doff::Int, src::PagedVector{T},
+    soff::Int, n::Int) where {T}
+    if doff < soff
+        for i in 0:n-1 dest[doff+i] = src[soff+i] end
+    else
+        for i in n-1:-1:0 dest[doff+i] = src[soff+i] end
+    end
 end
