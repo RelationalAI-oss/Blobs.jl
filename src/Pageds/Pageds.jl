@@ -93,7 +93,7 @@ end
 
 @generated function get_address(paged::Paged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
-    @assert i != 0
+    @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
         Paged{$(fieldtype(T, i))}(paged.ptr + $(fieldoffset(T, i)))
