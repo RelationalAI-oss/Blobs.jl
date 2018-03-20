@@ -42,6 +42,8 @@ function rewrite_address(expr)
     elseif expr.head == :ref
         object = expr.args[1]
         :(get_address($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
+    elseif expr.head == :macrocall
+        rewrite_address(macroexpand(expr))
     else
         error("Don't know how to compute address for $expr")
     end
@@ -155,7 +157,9 @@ end
 include("paged_vectors.jl")
 include("paged_bit_vectors.jl")
 include("paged_strings.jl")
+include("packed_memory_array.jl")
 
-export Paged, PagedVector, PagedBitVector, PagedString, @a, @v
+export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v
+export PagedPrimitive
 
 end
