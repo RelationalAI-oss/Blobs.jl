@@ -47,6 +47,7 @@ function Base.IndexStyle(_::Type{PagedVector{T}}) where {T}
 end
 
 # copying, with correct handling of overlapping regions
+# TODO use memcopy
 function Base.copy!(dest::PagedVector{T}, doff::Int, src::PagedVector{T},
     soff::Int, n::Int) where {T}
     if doff < soff
