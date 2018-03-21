@@ -19,7 +19,7 @@ using Delve.Pageds
 
 @testset "Insertions" begin
     pma = Paged{PackedMemoryArray{Int,Int}}(16)
-    for i in 1:10
+    for i in 1:16
         pma[i]=i
     end
     for (i,(k,v)) in enumerate(pma)
@@ -30,14 +30,41 @@ end
 
 @testset "InsertionsAndDeletions" begin
     pma = Paged{PackedMemoryArray{Int,Int}}(16)
-    for i in 1:10
+    for i in 1:16
         pma[i]=i
     end
-    for i in 2:2:10
+    for i in 2:2:16
         delete!(pma, i)
     end
-    @test length(pma) == 5
-    for i in 1:2:10
+    @test length(pma) == 8
+    for i in 1:2:16
         @test (pma[i]) == i
     end
+end
+
+@testset "Overwriting existing values" begin
+    pma = Paged{PackedMemoryArray{Int,Int}}(16)
+    for i in 1:16
+        pma[i]=i
+    end
+    for i in 1:16
+        pma[i]=2*i
+    end
+    @test length(pma) == 16
+    for i in 1:16
+        @test pma[i] == 2*i
+    end
+end
+
+@testset "Exceptions" begin
+    pma = Paged{PackedMemoryArray{Int,Int}}(16)
+    for i in 1:16
+        pma[i]=i
+    end
+    @test_throws ErrorException pma[17]=17
+    @test_throws KeyError pma[0]
+    @test_throws KeyError pma[17]
+
+    @test_throws ArgumentError Paged{PackedMemoryArray{Int,Int}}(15)
+    @test_throws ArgumentError Paged{PackedMemoryArray{Int,Int}}(2)
 end
