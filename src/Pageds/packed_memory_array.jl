@@ -62,9 +62,9 @@ end
 "Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
-        error("PackedMemoryArray length must be a power of two")
+        throw(ArgumentError("PackedMemoryArray length must be a power of two"))
     elseif length < pma_min_size
-        error("PackedMemoryArray has minimum length $pma_min_size")
+        throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
     end
 
     # TODO generate this boilerplate and parameterize the allocator
@@ -127,7 +127,7 @@ end
 function pma_maxcapacity(K, V, buffersize)
     fixed_overhead = sizeof(PackedMemoryArray{K,V})
     if fixed_overhead > buffersize
-        error("Cannot store even a 0-element PackedMemoryArray")
+        throw(ArgumentError(("Cannot store even a 0-element PackedMemoryArray")))
     end
 
     element_overhead = sizeof(K) + sizeof(V) + 1/8
