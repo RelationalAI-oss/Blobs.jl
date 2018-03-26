@@ -25,6 +25,8 @@ struct Paged{T} <: AbstractPaged{T}
     end
 end
 
+get_ptr(paged::Paged{T}) where {T} = paged.ptr
+
 "Allocate `size` bytes for an unintialized Paged{T}"
 Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
 
@@ -32,15 +34,15 @@ Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
 Paged{T}() where {T} = Paged{T}(sizeof(T))
 
 struct CloudPaged{T} <: AbstractPaged{T}
-    inner_paged::Paged{T}
     page::CxxWrap.SmartPointer{PagerWrap.Page}
 
     function CloudPaged{T}(page::CxxWrap.SmartPointer{PagerWrap.Page}) where {T}
         @assert isbits(T)
-        ptr = convert(Ptr{Void}, get_raw_content(page))
-        new(Paged{T}(ptr), page)
+        new(page)
     end
 end
+
+get_ptr(paged::CloudPaged{T}) where {T} = convert(Ptr{Void}, get_raw_content(paged.page))
 
 "Allocate `size` bytes for an unintialized CloudPaged{T}"
 function CloudPaged{T}(size::Integer) where {T}
@@ -115,25 +117,21 @@ macro v(expr)
     rewrite_value(expr)
 end
 
-@generated function get_address(paged::Paged{T}, ::Type{Val{field}}) where {T, field}
+@generated function get_address(paged::AbstractPaged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Paged{$(fieldtype(T, i))}(paged.ptr + $(fieldoffset(T, i)))
+        Paged{$(fieldtype(T, i))}(get_ptr(paged) + $(fieldoffset(T, i)))
     end
 end
 
-@generated function get_address(paged::CloudPaged{T}, ::Type{Val{field}}) where {T, field}
-    get_address(paged.inner_paged, Val{field})
-end
-
-@generated function Base.unsafe_load(paged::Paged{T}) where {T}
+@generated function Base.unsafe_load(paged::AbstractPaged{T}) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_load(convert(Ptr{T}, paged.ptr))
+            unsafe_load(convert(Ptr{T}, get_ptr(paged)))
         end
     else
         # is a composite type - recursively load its fields
@@ -145,17 +143,13 @@ end
     end
 end
 
-@generated function Base.unsafe_load(paged::CloudPaged{T}) where {T}
-    Base.unsafe_load(paged.inner_paged)
-end
-
 # can write to a Paged{T} using the syntax p[] = ...
-@generated function Base.unsafe_store!(paged::Paged{T}, value::T) where {T}
+@generated function Base.unsafe_store!(paged::AbstractPaged{T}, value::T) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_store!(convert(Ptr{T}, paged.ptr), value)
+            unsafe_store!(convert(Ptr{T}, get_ptr(paged)), value)
         end
     else
         # is a composite type - recursively store its fields
@@ -169,37 +163,21 @@ end
     end
 end
 
-@generated function Base.unsafe_store!(paged::CloudPaged{T}, value::T) where {T}
-    Base.unsafe_store!(paged.inner_paged, value)
-end
-
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-@inline function Base.unsafe_store!(paged::Paged{T}, value) where {T}
+@inline function Base.unsafe_store!(paged::AbstractPaged{T}, value) where {T}
     unsafe_store!(paged, convert(T, value))
-end
-
-@inline function Base.unsafe_store!(paged::CloudPaged{T}, value) where {T}
-    Base.unsafe_store!(paged.inner_paged, value)
 end
 
 # pointers to other parts of the page need to be converted into offsets
 
-@inline function Base.unsafe_load(paged::Paged{Paged{T}}) where {T}
+@inline function Base.unsafe_load(paged::AbstractPaged{Paged{T}}) where {T}
     offset = unsafe_load(Paged{UInt64}(paged.ptr))
-    Paged{T}(paged.ptr + offset)
+    Paged{T}(get_ptr(paged) + offset)
 end
 
-@inline function Base.unsafe_load(paged::CloudPaged{Paged{T}}) where {T}
-    Base.unsafe_load(paged.inner_paged)
-end
-
-@inline function Base.unsafe_store!(paged::Paged{Paged{T}}, value::Paged{T}) where {T}
-    offset = value.ptr - paged.ptr
-    unsafe_store!(Paged{UInt64}(paged.ptr), offset)
-end
-
-@inline function Base.unsafe_store!(paged::CloudPaged{Paged{T}}, value::Paged{T}) where {T}
-    Base.unsafe_store!(paged.inner_paged, value)
+@inline function Base.unsafe_store!(paged::AbstractPaged{Paged{T}}, value::Paged{T}) where {T}
+    offset = value.ptr - get_ptr(paged)
+    unsafe_store!(Paged{UInt64}(get_ptr(paged)), offset)
 end
 
 include("paged_vectors.jl")
