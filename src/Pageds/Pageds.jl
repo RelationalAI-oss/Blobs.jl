@@ -1,17 +1,22 @@
 module Pageds
 
+using CxxWrap
+using Delve.PagerWrap
+
 macro splice(iterator, body)
   @assert iterator.head == :call
   @assert iterator.args[1] == :in
   Expr(:..., :(($(esc(body)) for $(esc(iterator.args[2])) in $(esc(iterator.args[3])))))
 end
 
+abstract type AbstractPaged{T} end
+
 """
 A pointer to a `T` in some manually managed region of memory.
 
 TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 """
-struct Paged{T}
+struct Paged{T} <: AbstractPaged{T}
     ptr::Ptr{Void}
 
     function Paged{T}(ptr::Ptr{Void}) where {T}
@@ -25,6 +30,25 @@ Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
 
 "Allocate `sizeof(T)` bytes for an unintialized Paged{T}"
 Paged{T}() where {T} = Paged{T}(sizeof(T))
+
+struct CloudPaged{T} <: AbstractPaged{T}
+    inner_paged::Paged{T}
+    page::CxxWrap.SmartPointer{PagerWrap.Page}
+
+    function CloudPaged{T}(page::CxxWrap.SmartPointer{PagerWrap.Page}) where {T}
+        @assert isbits(T)
+        ptr = convert(Ptr{Void}, get_raw_content(page))
+        new(Paged{T}(ptr), page)
+    end
+end
+
+"Allocate `size` bytes for an unintialized CloudPaged{T}"
+function CloudPaged{T}(size::Integer) where {T}
+    CloudPaged{T}(PagerWrap.create_page(UInt64(size)))
+end
+
+"Allocate `sizeof(T)` bytes for an unintialized CloudPaged{T}"
+CloudPaged{T}() where {T} = CloudPaged{T}(sizeof(T))
 
 function rewrite_address(expr)
     if !(expr isa Expr)
@@ -100,6 +124,10 @@ end
     end
 end
 
+@generated function get_address(paged::CloudPaged{T}, ::Type{Val{field}}) where {T, field}
+    get_address(paged.inner_paged, Val{field})
+end
+
 @generated function Base.unsafe_load(paged::Paged{T}) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
@@ -115,6 +143,10 @@ end
             unsafe_load(get_address(paged, $(Val{field})))
         end)
     end
+end
+
+@generated function Base.unsafe_load(paged::CloudPaged{T}) where {T}
+    Base.unsafe_load(paged.inner_paged)
 end
 
 # can write to a Paged{T} using the syntax p[] = ...
@@ -137,9 +169,17 @@ end
     end
 end
 
+@generated function Base.unsafe_store!(paged::CloudPaged{T}, value::T) where {T}
+    Base.unsafe_store!(paged.inner_paged, value)
+end
+
 # if the value is the wrong type, try to convert it (just like setting a field normally)
 @inline function Base.unsafe_store!(paged::Paged{T}, value) where {T}
     unsafe_store!(paged, convert(T, value))
+end
+
+@inline function Base.unsafe_store!(paged::CloudPaged{T}, value) where {T}
+    Base.unsafe_store!(paged.inner_paged, value)
 end
 
 # pointers to other parts of the page need to be converted into offsets
@@ -149,9 +189,17 @@ end
     Paged{T}(paged.ptr + offset)
 end
 
+@inline function Base.unsafe_load(paged::CloudPaged{Paged{T}}) where {T}
+    Base.unsafe_load(paged.inner_paged)
+end
+
 @inline function Base.unsafe_store!(paged::Paged{Paged{T}}, value::Paged{T}) where {T}
     offset = value.ptr - paged.ptr
     unsafe_store!(Paged{UInt64}(paged.ptr), offset)
+end
+
+@inline function Base.unsafe_store!(paged::CloudPaged{Paged{T}}, value::Paged{T}) where {T}
+    Base.unsafe_store!(paged.inner_paged, value)
 end
 
 include("paged_vectors.jl")
