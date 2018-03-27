@@ -10,8 +10,16 @@ function Base.unsafe_copy!(ps::PagedString, string::Union{PagedString, String})
     unsafe_copy!(convert(Ptr{UInt8}, ps.ptr.ptr), pointer(string), string.len)
 end
 
+function Pageds.is_paged_type(x::Type{PagedString})
+    true
+end
+
+function Base.sizeof(x::Type{PagedString}, length::Int64)
+    length
+end
+
 function PagedString(string::Union{PagedString, String})
-    ps = PagedString(Paged{UInt8}(Libc.malloc(string.len)), string.len)
+    ps = PagedString(Paged{UInt8}(sizeof(PagedString, string.len)), string.len)
     unsafe_copy!(ps, string)
     ps
 end

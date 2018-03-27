@@ -65,7 +65,11 @@ function pagedsize(::Val{PackedMemoryArray{K,V}}, length::Int) where {K,V}
         length*sizeof(V) + Int64(ceil(length/8))
 end
 
-"Allocate a new `PackedMemoryArray{K,V}` capable of storing `length` elements"
+function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
+    true
+end
+
+"Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
         throw(ArgumentError("PackedMemoryArray length must be a power of two"))

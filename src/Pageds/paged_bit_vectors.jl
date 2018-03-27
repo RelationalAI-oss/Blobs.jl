@@ -9,14 +9,22 @@ struct PagedBit
     mask::UInt64
 end
 
-"Create a `PagedBitVector{T}` pointing at an existing allocation"
+"Create a `PagedBitVector` pointing at an existing allocation"
 function PagedBitVector(ptr::Ptr{Void}, length::Int64)
     PagedBitVector(Paged{UInt64}(ptr), length)
 end
 
-"Allocate a new `PagedBitVector{T}`"
+function Pageds.is_paged_type(x::Type{PagedBitVector})
+    true
+end
+
+function Base.sizeof(x::Type{PagedBitVector}, length::Int64)
+    UInt64(ceil(length / sizeof(UInt64)))
+end
+
+"Allocate a new `PagedBitVector`"
 function PagedBitVector(length::Int64)
-    size = UInt64(ceil(length / sizeof(UInt64)))
+    size = sizeof(PagedBitVector, length)
     PagedBitVector(Paged{UInt64}(size), length)
 end
 

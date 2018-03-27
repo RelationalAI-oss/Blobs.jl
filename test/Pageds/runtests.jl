@@ -1,5 +1,7 @@
-using Base.Test
+module TestPageds
+
 using Delve.Pageds
+using Base.Test
 
 # basic sanity checks
 
@@ -118,3 +120,5 @@ p = PagedString(s)
 @test string(p) isa String
 
 include("test_packed_memory_array.jl")
+
+end
