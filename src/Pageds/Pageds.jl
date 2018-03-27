@@ -160,5 +160,6 @@ include("paged_strings.jl")
 include("packed_memory_array.jl")
 
 export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v
+export pagedsize
 
 end

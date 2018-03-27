@@ -59,7 +59,13 @@ struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
     # end
 end
 
-"Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
+"Buffer size required for a `PackedMemoryArray{K,V}` holding `length` elements"
+function pagedsize(::Val{PackedMemoryArray{K,V}}, length::Int) where {K,V}
+    sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) +
+        length*sizeof(V) + Int64(ceil(length/8))
+end
+
+"Allocate a new `PackedMemoryArray{K,V}` capable of storing `length` elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
         throw(ArgumentError("PackedMemoryArray length must be a power of two"))
@@ -67,23 +73,12 @@ function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
         throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
     end
 
-    # TODO generate this boilerplate and parameterize the allocator
-    size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) +
-        length*sizeof(V) + Int64(ceil(length/8))
-    ptr = Libc.malloc(size)
-
-    pma = Paged{PackedMemoryArray{K,V}}(ptr, length)
-    fill!((@v pma.mask), false)
-    @v pma.count = 0
-    @v pma.max_capacity = length
-    pma_update_capacity!(pma, pma_min_size)
-    @v pma.rts = pma_default_thresholds
-
-    pma
+    ptr = Libc.malloc(pagedsize(Val{PackedMemoryArray{K,V}}(), length))
+    Paged{PackedMemoryArray{K,V}}(ptr, length, true)
 end
 
-"Create a `PackedMemoryArray{T}` pointing at an existing allocation"
-function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
+"Create a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
+function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int, fresh::Bool) where {K,V}
     pma = Paged{PackedMemoryArray{K,V}}(ptr)
 
     @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
@@ -91,6 +86,15 @@ function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
         length*sizeof(K), length)
     @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) +
         length*sizeof(K) + length*sizeof(V), length)
+    if fresh
+        fill!((@v pma.mask), false)
+        @v pma.count = 0
+        @v pma.max_capacity = length
+        pma_update_capacity!(pma, pma_min_size)
+        @v pma.rts = pma_default_thresholds
+    else
+        @assert (@v pma.max_capacity) == length
+    end
 
     pma
 end
@@ -420,6 +424,9 @@ function pma_insert_after!(p::Paged{PackedMemoryArray{K,V}}, i, key, value) wher
     pma_rebalance!(p, i, true)
 end
 
+function roomleft(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+    (@v p.count) < @v (p.max_capacity)
+end
 
 # AbstractDict methods (don't forget get(dict, key, default); haskey())
 # import Base: haskey, get, get!, getkey, delete!, push!, pop!, empty!,
