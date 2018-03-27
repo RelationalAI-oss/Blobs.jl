@@ -154,11 +154,135 @@ end
     unsafe_store!(Paged{UInt64}(get_ptr(paged)), offset)
 end
 
+"""
+    is_paged_type(x::Type{T}) where {T}
+
+Returns true if the given type is not Paged
+"""
+function is_paged_type(x::Type{T}) where {T}
+    false
+end
+
+function is_paged_type(x::Type{Paged{T}}) where {T}
+    true
+end
+
 include("paged_vectors.jl")
 include("paged_bit_vectors.jl")
 include("paged_strings.jl")
 include("packed_memory_array.jl")
 
-export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v
+"""
+Extracts the field initializer data from `Val` type
+"""
+function fieldinfo(size_init::Type{Type{Val{fieldinit}}}) where {fieldinit}
+    fieldinit
+end
+
+"""
+Calculates the number of bytes required for allocating a
+type that consists of one or more `Paged` data memebers
+"""
+function pagedsize(tp::Type{T}, fieldinit::Pair{Symbol,Int64}) where {T}
+    (field, fieldlen) = fieldinit
+    i = findfirst(fieldnames(T), field)
+    @assert i != 0 "$T has no field $field"
+    fieldtp = fieldtype(T, i)
+    @assert is_paged_type(fieldtp) "$T.$field is not a paged field. Only paged fields should be in the initializer list."
+    sizeof(fieldtp, fieldlen)
+end
+
+"""
+Initalizes a type that is composed of one or more `Paged` data members.
+
+It fixes the pointers to these `Paged` fields to point into the right memory location.
+
+This method returns a tuple of expressions:
+  1. Instance initialization expression (that returns the instance itself at the end)
+  2. A pointer to the end of current field. It determines where the next field (if any) exists
+"""
+function pagedinit(tp::Type{T}, instance::Expr, start::Expr, fieldinit::Pair{Symbol,Int64}) where {T}
+    (field, fieldlen) = fieldinit
+    fieldsize = pagedsize(tp, fieldinit)
+    i = findfirst(fieldnames(T), field)
+    @assert i != 0 "$T has no field $field"
+    fieldtp = fieldtype(T, i)
+    (quote
+        inst = $instance
+        @v inst.$field = $fieldtp($start, $fieldlen)
+        inst
+    end, :($start + $fieldsize))
+end
+
+"""
+    pagedalloc(tp::Type{T}, alloc::Function, size_inits...) where {T}
+
+Allocates and correctly initializes the pointers in a type that is composed
+of one or more `Paged` data members. 
+
+```@example
+using Delve.Pageds # hide
+
+"Sample data structure, mixing primitive and paged fields"
+struct Foo
+    a::Int
+    b::Pageds.PagedBitVector
+    c::Bool
+    d::Pageds.PagedVector{Float64}
+end
+
+#
+# Desired layout of Foo in memory:
+#
+# ┌───┬─────┐
+# │ a │ ... │
+# │ b │  ■──┼───┐
+# │ c │ ... │   │
+# │ d |  ■──┼───┼──┐
+# ├───┴─────┤   │  │
+# │ bs ...  │ <─┘  │
+# │         │      │
+# │         │      │
+# ├ ─ ─ ─ ─ ┤      │
+# │ ds ...  │ <────┘
+# │         │
+# └─────────┘
+#
+
+# Allocate a new `Foo` with `a` uninitialized, `b` of length `10`, `c` with value `false`, `d` of length `20`
+foo = pagedalloc(Foo, Libc.malloc, Val{(:b, 10)}, Val{(:d,20)})
+@v foo.c = false
+
+nothing # hide
+```
+
+# Arguments
+- `tp`: the target type that is composed of one or more `Paged` data members
+- `alloc`: the allocation function that accepts an `Integer` parameter. You can use `Libc.malloc` or your own function if you want to do custom memory manegement.
+- `size_inits`: the list of size initializer. You can pass several argments of type `Val{Tuple{Symbol, Int64}}`. This list should only include all the `Paged` fields. Each argument is a tuple of field `Symbol` and its `length` argument wrapped inside a `Val`.
+"""
+@generated function pagedalloc(tp::Type{T}, alloc::Function, size_inits...) where {T}
+    field_inits = Dict{Symbol,Int64}(((field, fieldlen) = fieldinfo(size_init); field => fieldlen) for size_init in size_inits)
+
+    size_tp = sizeof(T)
+    total_size = size_tp
+    for field_init in field_inits
+        total_size += pagedsize(T, field_init)
+    end
+    
+    alloc_ptr = :(alloc($total_size))
+    instance = :(Paged{T}($alloc_ptr))
+    start = :($alloc_ptr + $size_tp)
+
+    for field in fieldnames(T)
+        if is_paged_type(fieldtype(T, field))
+            @assert haskey(field_inits, field) "$T.$field is not in the initializer list. All the paged fields should be present in the initializer list."
+            (instance, start) = pagedinit(T, instance, start, field => field_inits[field])
+        end
+    end
+    instance
+end
+
+export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v, pagedalloc
 
 end

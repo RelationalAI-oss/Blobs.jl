@@ -59,6 +59,10 @@ struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
     # end
 end
 
+function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
+    true
+end
+
 "Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
