@@ -1,6 +1,6 @@
 module Pageds
 
-using Util
+using Delve.Util
 
 abstract type AbstractPaged{T} end
 
