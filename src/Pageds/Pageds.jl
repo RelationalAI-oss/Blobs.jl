@@ -1,8 +1,5 @@
 module Pageds
 
-using CxxWrap
-using Delve.PagerWrap
-
 macro splice(iterator, body)
   @assert iterator.head == :call
   @assert iterator.args[1] == :in
@@ -32,25 +29,6 @@ Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
 
 "Allocate `sizeof(T)` bytes for an unintialized Paged{T}"
 Paged{T}() where {T} = Paged{T}(sizeof(T))
-
-struct CloudPaged{T} <: AbstractPaged{T}
-    page::CxxWrap.SmartPointer{PagerWrap.Page}
-
-    function CloudPaged{T}(page::CxxWrap.SmartPointer{PagerWrap.Page}) where {T}
-        @assert isbits(T)
-        new(page)
-    end
-end
-
-get_ptr(paged::CloudPaged{T}) where {T} = convert(Ptr{Void}, get_raw_content(paged.page))
-
-"Allocate `size` bytes for an unintialized CloudPaged{T}"
-function CloudPaged{T}(size::Integer) where {T}
-    CloudPaged{T}(PagerWrap.create_page(UInt64(size)))
-end
-
-"Allocate `sizeof(T)` bytes for an unintialized CloudPaged{T}"
-CloudPaged{T}() where {T} = CloudPaged{T}(sizeof(T))
 
 function rewrite_address(expr)
     if !(expr isa Expr)
