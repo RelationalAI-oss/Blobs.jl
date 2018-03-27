@@ -25,15 +25,6 @@ const pma_min_size = 4
 #
 # predictor_size(n) = convert(Int, ceil(log2(n)))
 
-struct Bar
-    b::Int
-end
-
-struct Foo
-    a::Int
-    bar::Bar
-end
-
 struct TreeDimensions
     height::Int
     segment_size::Int
@@ -71,9 +62,9 @@ end
 "Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
-        error("PackedMemoryArray length must be a power of two")
+        throw(ArgumentError("PackedMemoryArray length must be a power of two"))
     elseif length < pma_min_size
-        error("PackedMemoryArray has minimum length $pma_min_size")
+        throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
     end
 
     # TODO generate this boilerplate and parameterize the allocator
@@ -85,8 +76,8 @@ function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     fill!((@v pma.mask), false)
     @v pma.count = 0
     @v pma.max_capacity = length
-    @v pma.capacity = pma_min_size
-    @v pma.dims = TreeDimensions(pma_min_size)
+    pma_update_capacity!(pma, pma_min_size)
+    @v pma.rts = pma_default_thresholds
 
     pma
 end
@@ -136,7 +127,7 @@ end
 function pma_maxcapacity(K, V, buffersize)
     fixed_overhead = sizeof(PackedMemoryArray{K,V})
     if fixed_overhead > buffersize
-        error("Cannot store even a 0-element PackedMemoryArray")
+        throw(ArgumentError(("Cannot store even a 0-element PackedMemoryArray")))
     end
 
     element_overhead = sizeof(K) + sizeof(V) + 1/8
@@ -317,6 +308,14 @@ function pma_sweep!(p::Paged{PackedMemoryArray{K,V}}, window) where {K,V}
     pma_spread_right!(p, window, count)
 end
 
+function pma_update_capacity!(p::Paged{PackedMemoryArray{K,V}}, length::Int) where {K,V}
+    @v p.capacity = length
+    @v p.dims = TreeDimensions(length)
+    @v p.keys.length = length
+    @v p.values.length = length
+    @v p.mask.length = length
+end
+
 function pma_grow_or_shrink!(p::Paged{PackedMemoryArray{K,V}}, grow::Bool) where {K,V}
     old_size = @v p.capacity
     if grow
@@ -332,8 +331,7 @@ function pma_grow_or_shrink!(p::Paged{PackedMemoryArray{K,V}}, grow::Bool) where
     end
 
     pma_pack_left!(p, Window(1, old_size))
-    @v p.capacity = new_size
-    @v p.dims = TreeDimensions(new_size)
+    pma_update_capacity!(p, new_size)
     # p.pred = CircularBuffer{PredictorCell{K}}(predictor_size(new_size))
 
     if grow
@@ -365,7 +363,9 @@ function pma_rebalance!(p::Paged{PackedMemoryArray{K,V}}, i, after_insert::Bool)
     end
 
     # Root node is out of threshold; need to resize entire PackedMemoryArray
-    pma_grow_or_shrink!(p, after_insert)
+    if (!after_insert || (@v p.capacity) < (@v p.max_capacity))
+        pma_grow_or_shrink!(p, after_insert)
+    end
 end
 
 function memmove!(dst, doff, src, soff, len)
@@ -463,8 +463,10 @@ function Base.setindex!(p::Paged{PackedMemoryArray{K,V}}, value, key) where {K,V
     i = pma_find_glb(p, key)
     if i > 0 && (@v p.keys[i]) == key
         @v p.values[i] = value
-    else
+    elseif (@v p.count) < (@v p.max_capacity)
         pma_insert_after!(p, i, key, value)
+    else
+        error("Maximum capacity limited to $(@v p.max_capacity)")
     end
     p
 end
@@ -508,11 +510,53 @@ Base.length(p::Paged{PackedMemoryArray{K,V}}) where {K,V} = @v p.count
 #     Pair{K,V}[kv for kv in p]
 
 function Base.empty!(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
-    n = pma_min_size
-    @v p.capacity = n
+    pma_update_capacity!(p, pma_min_size)
     fill!((@v p.mask), false)
     @v p.count = 0
-    @v p.dims = TreeDimensions(n)
     # p.pred = CircularBuffer{PredictorCell}(predictor_size(n))
     p
+end
+
+function showfirst(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
+    shown = 0
+    for kv in p
+        print(io, "\n $kv")
+        shown += 1
+        if shown > count
+            break
+        end
+    end
+end
+
+function showlast(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
+    mask = @v p.mask
+    kvs = Vector{Pair{K,V}}()
+    i = (@v p.capacity) + 1
+    while count > 0
+        i = Base.findprev(mask, i-1)
+        if i == 0
+            break
+        else
+            push!(kvs, Pair{K,V}((@v p.keys)[i], (@v p.values)[i]))
+            count -= 1
+        end
+    end
+    for i in length(kvs):-1:1
+        print(io, "\n $(kvs[i])")
+    end
+end
+
+function Base.show(io::IO, p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+    print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V}")
+    if (@v p.count) == 0
+        return
+    end
+    print(io, ":")
+    if (@v p.count) > 30
+        showfirst(io, p, 20)
+        print(io, "\n     ⋮")
+        showlast(io, p, 10)
+    else
+        showfirst(io, p, (@v p.count))
+    end
 end

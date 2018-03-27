@@ -2,12 +2,14 @@ module Pageds
 
 using Util
 
+abstract type AbstractPaged{T} end
+
 """
 A pointer to a `T` in some manually managed region of memory.
 
 TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 """
-struct Paged{T}
+struct Paged{T} <: AbstractPaged{T}
     ptr::Ptr{Void}
 
     function Paged{T}(ptr::Ptr{Void}) where {T}
@@ -15,6 +17,8 @@ struct Paged{T}
         new(ptr)
     end
 end
+
+get_ptr(paged::Paged{T}) where {T} = paged.ptr
 
 "Allocate `size` bytes for an unintialized Paged{T}"
 Paged{T}(size::Integer) where {T} = Paged{T}(Libc.malloc(size))
@@ -87,21 +91,21 @@ macro v(expr)
     rewrite_value(expr)
 end
 
-@generated function get_address(paged::Paged{T}, ::Type{Val{field}}) where {T, field}
+@generated function get_address(paged::AbstractPaged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Paged{$(fieldtype(T, i))}(paged.ptr + $(fieldoffset(T, i)))
+        Paged{$(fieldtype(T, i))}(get_ptr(paged) + $(fieldoffset(T, i)))
     end
 end
 
-@generated function Base.unsafe_load(paged::Paged{T}) where {T}
+@generated function Base.unsafe_load(paged::AbstractPaged{T}) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_load(convert(Ptr{T}, paged.ptr))
+            unsafe_load(convert(Ptr{T}, get_ptr(paged)))
         end
     else
         # is a composite type - recursively load its fields
@@ -114,12 +118,12 @@ end
 end
 
 # can write to a Paged{T} using the syntax p[] = ...
-@generated function Base.unsafe_store!(paged::Paged{T}, value::T) where {T}
+@generated function Base.unsafe_store!(paged::AbstractPaged{T}, value::T) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_store!(convert(Ptr{T}, paged.ptr), value)
+            unsafe_store!(convert(Ptr{T}, get_ptr(paged)), value)
         end
     else
         # is a composite type - recursively store its fields
@@ -134,20 +138,20 @@ end
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-@inline function Base.unsafe_store!(paged::Paged{T}, value) where {T}
+@inline function Base.unsafe_store!(paged::AbstractPaged{T}, value) where {T}
     unsafe_store!(paged, convert(T, value))
 end
 
 # pointers to other parts of the page need to be converted into offsets
 
-@inline function Base.unsafe_load(paged::Paged{Paged{T}}) where {T}
+@inline function Base.unsafe_load(paged::AbstractPaged{Paged{T}}) where {T}
     offset = unsafe_load(Paged{UInt64}(paged.ptr))
-    Paged{T}(paged.ptr + offset)
+    Paged{T}(get_ptr(paged) + offset)
 end
 
-@inline function Base.unsafe_store!(paged::Paged{Paged{T}}, value::Paged{T}) where {T}
-    offset = value.ptr - paged.ptr
-    unsafe_store!(Paged{UInt64}(paged.ptr), offset)
+@inline function Base.unsafe_store!(paged::AbstractPaged{Paged{T}}, value::Paged{T}) where {T}
+    offset = value.ptr - get_ptr(paged)
+    unsafe_store!(Paged{UInt64}(get_ptr(paged)), offset)
 end
 
 include("paged_vectors.jl")
