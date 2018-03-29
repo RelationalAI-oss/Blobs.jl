@@ -428,8 +428,8 @@ function pma_insert_after!(p::Paged{PackedMemoryArray{K,V}}, i, key, value) wher
     pma_rebalance!(p, i, true)
 end
 
-function roomleft(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
-    (@v p.count) < @v (p.max_capacity)
+function maxlength(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+    @v p.max_capacity
 end
 
 # AbstractDict methods (don't forget get(dict, key, default); haskey())

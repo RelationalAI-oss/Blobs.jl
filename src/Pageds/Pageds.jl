@@ -218,7 +218,7 @@ end
     pagedalloc(tp::Type{T}, alloc::Function, size_inits...) where {T}
 
 Allocates and correctly initializes the pointers in a type that is composed
-of one or more `Paged` data members. 
+of one or more `Paged` data members.
 
 ```@example
 using Delve.Pageds # hide
@@ -269,7 +269,7 @@ nothing # hide
     for field_init in field_inits
         total_size += pagedsize(T, field_init)
     end
-    
+
     alloc_ptr = :(alloc($total_size))
     instance = :(Paged{T}($alloc_ptr))
     start = :($alloc_ptr + $size_tp)
@@ -284,5 +284,6 @@ nothing # hide
 end
 
 export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v, pagedalloc
+export pagedsize
 
 end
