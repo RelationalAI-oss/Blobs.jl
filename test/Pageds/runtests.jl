@@ -120,5 +120,6 @@ p = PagedString(s)
 @test string(p) isa String
 
 include("test_packed_memory_array.jl")
+include("test_pagedalloc.jl")
 
 end
