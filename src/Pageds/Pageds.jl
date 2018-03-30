@@ -180,16 +180,29 @@ function fieldinfo(size_init::Type{Type{Val{fieldinit}}}) where {fieldinit}
 end
 
 """
-Calculates the number of bytes required for allocating a
+Calculates the number of bytes required for allocating a `Paged` field of a
 type that consists of one or more `Paged` data memebers
 """
-function pagedsize(tp::Type{T}, fieldinit::Pair{Symbol,Int64}) where {T}
+function pagedfieldsize(::Type{T}, fieldinit::Pair{Symbol,Int64}) where {T}
     (field, fieldlen) = fieldinit
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     fieldtp = fieldtype(T, i)
     @assert is_paged_type(fieldtp) "$T.$field is not a paged field. Only paged fields should be in the initializer list."
     sizeof(fieldtp, fieldlen)
+end
+
+"""
+Calculates the number of bytes required for allocating a
+type that consists of one or more `Paged` data memebers
+"""
+function pagedsize(::Type{T}, field_inits::Dict{Symbol,Int64}) where {T}
+    size_tp = sizeof(T)
+    total_size = size_tp
+    for field_init in field_inits
+        total_size += pagedfieldsize(T, field_init)
+    end
+    total_size
 end
 
 """
@@ -201,9 +214,9 @@ This method returns a tuple of expressions:
   1. Instance initialization expression (that returns the instance itself at the end)
   2. A pointer to the end of current field. It determines where the next field (if any) exists
 """
-function pagedinit(tp::Type{T}, instance::Expr, start::Expr, fieldinit::Pair{Symbol,Int64}) where {T}
+function pagedinit(::Type{T}, instance::Expr, start::Expr, fieldinit::Pair{Symbol,Int64}) where {T}
     (field, fieldlen) = fieldinit
-    fieldsize = pagedsize(tp, fieldinit)
+    fieldsize = pagedfieldsize(T, fieldinit)
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     fieldtp = fieldtype(T, i)
@@ -261,17 +274,14 @@ nothing # hide
 - `alloc`: the allocation function that accepts an `Integer` parameter. You can use `Libc.malloc` or your own function if you want to do custom memory manegement.
 - `size_inits`: the list of size initializer. You can pass several argments of type `Val{Tuple{Symbol, Int64}}`. This list should only include all the `Paged` fields. Each argument is a tuple of field `Symbol` and its `length` argument wrapped inside a `Val`.
 """
-@generated function pagedalloc(tp::Type{T}, alloc::Function, size_inits...) where {T}
+@generated function pagedalloc(::Type{T}, alloc::Function, size_inits...) where {T}
     field_inits = Dict{Symbol,Int64}(((field, fieldlen) = fieldinfo(size_init); field => fieldlen) for size_init in size_inits)
 
-    size_tp = sizeof(T)
-    total_size = size_tp
-    for field_init in field_inits
-        total_size += pagedsize(T, field_init)
-    end
+    total_size = pagedsize(T, field_inits)
 
     alloc_ptr = :(alloc($total_size))
     instance = :(Paged{T}($alloc_ptr))
+    size_tp = sizeof(T)
     start = :($alloc_ptr + $size_tp)
 
     for field in fieldnames(T)
