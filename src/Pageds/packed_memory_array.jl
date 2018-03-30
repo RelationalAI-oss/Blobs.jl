@@ -59,12 +59,6 @@ struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
     # end
 end
 
-"Buffer size required for a `PackedMemoryArray{K,V}` holding `length` elements"
-function pagedsize(::Val{PackedMemoryArray{K,V}}, length::Int) where {K,V}
-    sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) +
-        length*sizeof(V) + Int64(ceil(length/8))
-end
-
 function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
     true
 end
@@ -76,20 +70,15 @@ function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     elseif length < pma_min_size
         throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
     end
+    
+    pma = pagedalloc(PackedMemoryArray{K,V}, Libc.malloc,
+            Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
 
-    ptr = Libc.malloc(pagedsize(Val{PackedMemoryArray{K,V}}(), length))
-    Paged{PackedMemoryArray{K,V}}(ptr, length, true)
+    init_pma(pma, length, true)
 end
 
-"Create a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
-function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int, fresh::Bool) where {K,V}
-    pma = Paged{PackedMemoryArray{K,V}}(ptr)
-
-    @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-    @v pma.values = PagedVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) +
-        length*sizeof(K), length)
-    @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) +
-        length*sizeof(K) + length*sizeof(V), length)
+"Initializes a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
+function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
     if fresh
         fill!((@v pma.mask), false)
         @v pma.count = 0
