@@ -63,6 +63,21 @@ function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
     true
 end
 
+"Initializes a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
+function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
+    if fresh
+        fill!((@v pma.mask), false)
+        @v pma.count = 0
+        @v pma.max_capacity = length
+        pma_update_capacity!(pma, pma_min_size)
+        @v pma.rts = pma_default_thresholds
+    else
+        @assert (@v pma.max_capacity) == length
+    end
+
+    pma
+end
+
 "Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
 function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
@@ -77,19 +92,11 @@ function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     init_pma(pma, length, true)
 end
 
-"Initializes a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
-function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
-    if fresh
-        fill!((@v pma.mask), false)
-        @v pma.count = 0
-        @v pma.max_capacity = length
-        pma_update_capacity!(pma, pma_min_size)
-        @v pma.rts = pma_default_thresholds
-    else
-        @assert (@v pma.max_capacity) == length
-    end
+function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
+    pma = pagedwire(Paged{PackedMemoryArray{K,V}}(ptr),
+            Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
 
-    pma
+    init_pma(pma, length, true)
 end
 
 # function PackedMemoryArray{K,V}(rts::Thresholds, kv) where {K,V}
@@ -547,7 +554,7 @@ function showlast(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
 end
 
 function Base.show(io::IO, p::Paged{PackedMemoryArray{K,V}}) where {K,V}
-    print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V}")
+    print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V} (with $(@v p.max_capacity)-element max capacity))")
     if (@v p.count) == 0
         return
     end
