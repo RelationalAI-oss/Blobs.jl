@@ -91,6 +91,10 @@ macro v(expr)
     rewrite_value(expr)
 end
 
+function get_address(paged::AbstractPaged{Paged{T}}, ::Type{Val{field}}) where {T, field}
+    get_address(Paged{T}(get_ptr(paged)), Val{field})
+end
+
 @generated function get_address(paged::AbstractPaged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
