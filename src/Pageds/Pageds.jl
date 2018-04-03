@@ -91,6 +91,10 @@ macro v(expr)
     rewrite_value(expr)
 end
 
+function get_address(paged::AbstractPaged{Paged{T}}, ::Type{Val{field}}) where {T, field}
+    get_address(Paged{T}(get_ptr(paged)), Val{field})
+end
+
 @generated function get_address(paged::AbstractPaged{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
@@ -159,13 +163,8 @@ end
 
 Returns true if the given type is not Paged
 """
-function is_paged_type(x::Type{T}) where {T}
-    false
-end
-
-function is_paged_type(x::Type{Paged{T}}) where {T}
-    true
-end
+is_paged_type(x::Type{T}) where {T} = false
+is_paged_type(x::Type{Paged{T}}) where {T} = true
 
 include("paged_vectors.jl")
 include("paged_bit_vectors.jl")
@@ -180,16 +179,52 @@ function fieldinfo(size_init::Type{Type{Val{fieldinit}}}) where {fieldinit}
 end
 
 """
-Calculates the number of bytes required for allocating a
+This method determines the number of bytes required to store the bits of a type
+{T} that are pointed at using the paged fields of {T}
+"""
+function pageddatasize(x::Type{T}, length::Int64) where {T}
+    total = 0
+    for field in fieldnames(T)
+        fieldtp = fieldtype(T, field)
+        if is_paged_type(fieldtp)
+            total += pageddatasize(fieldtp, length)
+        end
+    end
+    total
+end
+
+function pageddatasize(x::Type{Paged{T}}, length::Int64) where {T}
+    total = sizeof(T) + pageddatasize(T, length)
+end
+
+"""
+Calculates the number of bytes required for allocating a `Paged` field of a
 type that consists of one or more `Paged` data memebers
 """
-function pagedsize(tp::Type{T}, fieldinit::Pair{Symbol,Int64}) where {T}
+function pagedfieldsize(::Type{T}, fieldinit::Pair{Symbol,Int64}) where {T}
     (field, fieldlen) = fieldinit
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     fieldtp = fieldtype(T, i)
     @assert is_paged_type(fieldtp) "$T.$field is not a paged field. Only paged fields should be in the initializer list."
-    sizeof(fieldtp, fieldlen)
+    pageddatasize(fieldtp, fieldlen)
+end
+
+function pagedfieldsize(::Type{Paged{T}}, fieldinit::Pair{Symbol,Int64}) where {T}
+    pagedfieldsize(T, fieldinit)
+end
+
+"""
+Calculates the number of bytes required for allocating a
+type that consists of one or more `Paged` data memebers
+"""
+function pagedsize(::Type{T}, field_inits::Dict{Symbol,Int64}) where {T}
+    size_tp = sizeof(T)
+    total_size = size_tp
+    for field_init in field_inits
+        total_size += pagedfieldsize(T, field_init)
+    end
+    total_size
 end
 
 """
@@ -201,17 +236,52 @@ This method returns a tuple of expressions:
   1. Instance initialization expression (that returns the instance itself at the end)
   2. A pointer to the end of current field. It determines where the next field (if any) exists
 """
-function pagedinit(tp::Type{T}, instance::Expr, start::Expr, fieldinit::Pair{Symbol,Int64}) where {T}
+function pagedinit(::Type{T}, inst_block::Expr, start::UInt64, fieldinit::Pair{Symbol,Int64}) where {T}
     (field, fieldlen) = fieldinit
-    fieldsize = pagedsize(tp, fieldinit)
+    fieldsize = pagedfieldsize(T, fieldinit)
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     fieldtp = fieldtype(T, i)
-    (quote
-        inst = $instance
-        @v inst.$field = $fieldtp($start, $fieldlen)
-        inst
-    end, :($start + $fieldsize))
+    (if is_paged_type(fieldtp)
+        quote
+            instance = $inst_block
+            @v instance.$field = $fieldtp(instance.ptr + $start, $fieldlen)
+            instance
+        end
+    else
+        quote
+            instance = $inst_block
+            instance.$field = $fieldtp(instance.ptr + $start, $fieldlen)
+            instance
+        end
+    end, start + fieldsize)
+end
+
+function pagedwire(::Type{T}, alloc_page::Expr, field_inits::Dict{Symbol,Int64}) where {T}
+    size_tp = sizeof(T)
+
+    start = UInt64(size_tp)
+    
+    wired_block = quote
+        $alloc_page
+    end
+    
+    for field in fieldnames(T)
+        if is_paged_type(fieldtype(T, field))
+            @assert haskey(field_inits, field) "$T.$field is not in the initializer list. All the paged fields should be present in the initializer list."
+            (wired_block, start) = pagedinit(T, wired_block, start, field => field_inits[field])
+        end
+    end
+    
+    wired_block
+end
+
+@generated function pagedwire(alloc_page::Paged{T}, size_inits...) where {T}
+    field_inits = Dict{Symbol,Int64}(((field, fieldlen) = fieldinfo(size_init); field => fieldlen) for size_init in size_inits)
+    alloc_page_block = quote
+        alloc_page
+    end
+    pagedwire(T, alloc_page_block, field_inits)
 end
 
 """
@@ -261,29 +331,20 @@ nothing # hide
 - `alloc`: the allocation function that accepts an `Integer` parameter. You can use `Libc.malloc` or your own function if you want to do custom memory manegement.
 - `size_inits`: the list of size initializer. You can pass several argments of type `Val{Tuple{Symbol, Int64}}`. This list should only include all the `Paged` fields. Each argument is a tuple of field `Symbol` and its `length` argument wrapped inside a `Val`.
 """
-@generated function pagedalloc(tp::Type{T}, alloc::Function, size_inits...) where {T}
+@generated function pagedalloc(::Type{T}, alloc::Function, size_inits...) where {T}
     field_inits = Dict{Symbol,Int64}(((field, fieldlen) = fieldinfo(size_init); field => fieldlen) for size_init in size_inits)
 
-    size_tp = sizeof(T)
-    total_size = size_tp
-    for field_init in field_inits
-        total_size += pagedsize(T, field_init)
+    total_size = pagedsize(T, field_inits)
+    
+    alloc_page_block = quote
+        alloc_ptr = alloc($total_size)
+        Paged{T}(alloc_ptr)
     end
-
-    alloc_ptr = :(alloc($total_size))
-    instance = :(Paged{T}($alloc_ptr))
-    start = :($alloc_ptr + $size_tp)
-
-    for field in fieldnames(T)
-        if is_paged_type(fieldtype(T, field))
-            @assert haskey(field_inits, field) "$T.$field is not in the initializer list. All the paged fields should be present in the initializer list."
-            (instance, start) = pagedinit(T, instance, start, field => field_inits[field])
-        end
-    end
-    instance
+    
+    pagedwire(T, alloc_page_block, field_inits)
 end
 
-export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v, pagedalloc
-export pagedsize
+export Paged, PagedVector, PagedBitVector, PagedString, PackedMemoryArray, @a, @v
+export pagedsize, pagedwire, pagedalloc
 
 end

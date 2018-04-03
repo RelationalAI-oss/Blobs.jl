@@ -18,13 +18,13 @@ function Pageds.is_paged_type(x::Type{PagedBitVector})
     true
 end
 
-function Base.sizeof(x::Type{PagedBitVector}, length::Int64)
+function pageddatasize(x::Type{PagedBitVector}, length::Int64)
     UInt64(ceil(length / sizeof(UInt64)))
 end
 
 "Allocate a new `PagedBitVector`"
 function PagedBitVector(length::Int64)
-    size = sizeof(PagedBitVector, length)
+    size = pageddatasize(PagedBitVector, length)
     PagedBitVector(Paged{UInt64}(size), length)
 end
 

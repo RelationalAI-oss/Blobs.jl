@@ -59,37 +59,12 @@ struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
     # end
 end
 
-"Buffer size required for a `PackedMemoryArray{K,V}` holding `length` elements"
-function pagedsize(::Val{PackedMemoryArray{K,V}}, length::Int) where {K,V}
-    sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) +
-        length*sizeof(V) + Int64(ceil(length/8))
-end
-
 function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
     true
 end
 
-"Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
-function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
-    if !ispow2(length)
-        throw(ArgumentError("PackedMemoryArray length must be a power of two"))
-    elseif length < pma_min_size
-        throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
-    end
-
-    ptr = Libc.malloc(pagedsize(Val{PackedMemoryArray{K,V}}(), length))
-    Paged{PackedMemoryArray{K,V}}(ptr, length, true)
-end
-
-"Create a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
-function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int, fresh::Bool) where {K,V}
-    pma = Paged{PackedMemoryArray{K,V}}(ptr)
-
-    @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-    @v pma.values = PagedVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) +
-        length*sizeof(K), length)
-    @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) +
-        length*sizeof(K) + length*sizeof(V), length)
+"Initializes a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
+function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
     if fresh
         fill!((@v pma.mask), false)
         @v pma.count = 0
@@ -101,6 +76,27 @@ function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int, fresh::Bool)
     end
 
     pma
+end
+
+"Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
+function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
+    if !ispow2(length)
+        throw(ArgumentError("PackedMemoryArray length must be a power of two"))
+    elseif length < pma_min_size
+        throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
+    end
+    
+    pma = pagedalloc(PackedMemoryArray{K,V}, Libc.malloc,
+            Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
+
+    init_pma(pma, length, true)
+end
+
+function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
+    pma = pagedwire(Paged{PackedMemoryArray{K,V}}(ptr),
+            Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
+
+    init_pma(pma, length, true)
 end
 
 # function PackedMemoryArray{K,V}(rts::Thresholds, kv) where {K,V}
@@ -558,7 +554,7 @@ function showlast(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
 end
 
 function Base.show(io::IO, p::Paged{PackedMemoryArray{K,V}}) where {K,V}
-    print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V}")
+    print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V} (with $(@v p.max_capacity)-element max capacity))")
     if (@v p.count) == 0
         return
     end

@@ -18,13 +18,13 @@ function Pageds.is_paged_type(x::Type{PagedVector{T}}) where {T}
     true
 end
 
-function Base.sizeof(x::Type{PagedVector{T}}, length::Int64) where {T}
-    length * sizeof(T)
+function pageddatasize(x::Type{PagedVector{T}}, length::Int64) where {T}
+    sizeof(T) * length
 end
 
 "Allocate a new `PagedVector{T}`"
 function PagedVector{T}(length::Int64) where {T}
-    PagedVector{T}(Paged{T}(sizeof(PagedVector{T}, length)), length)
+    PagedVector{T}(Paged{T}(pageddatasize(PagedVector{T}, length)), length)
 end
 
 @inline function get_address(pv::PagedVector{T}, i::Int) where {T}
