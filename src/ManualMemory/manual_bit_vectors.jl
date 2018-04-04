@@ -1,58 +1,56 @@
 "A fixed-length bit vector whose data is stored in some manually managed region of memory."
-struct PagedBitVector <: AbstractArray{Bool, 1}
-    ptr::Paged{UInt64}
+struct ManualBitVector <: AbstractArray{Bool, 1}
+    ptr::Manual{UInt64}
     length::Int64
 end
 
-struct PagedBit
-    ptr::Paged{UInt64}
+struct ManualBit
+    ptr::Manual{UInt64}
     mask::UInt64
 end
 
-"Create a `PagedBitVector` pointing at an existing allocation"
-function PagedBitVector(ptr::Ptr{Void}, length::Int64)
-    PagedBitVector(Paged{UInt64}(ptr), length)
+"Create a `ManualBitVector` pointing at an existing allocation"
+function ManualBitVector(ptr::Ptr{Void}, length::Int64)
+    ManualBitVector(Manual{UInt64}(ptr), length)
 end
 
-function Pageds.is_paged_type(x::Type{PagedBitVector})
-    true
-end
+is_manual_type(x::Type{ManualBitVector}) = true
 
-function pageddatasize(x::Type{PagedBitVector}, length::Int64)
+function manual_datasize(x::Type{ManualBitVector}, length::Int64)
     UInt64(ceil(length / sizeof(UInt64)))
 end
 
-"Allocate a new `PagedBitVector`"
-function PagedBitVector(length::Int64)
-    size = pageddatasize(PagedBitVector, length)
-    PagedBitVector(Paged{UInt64}(size), length)
+"Allocate a new `ManualBitVector`"
+function ManualBitVector(length::Int64)
+    size = manual_datasize(ManualBitVector, length)
+    ManualBitVector(Manual{UInt64}(size), length)
 end
 
-function get_address(pv::PagedBitVector, i::Int)
+function get_address(pv::ManualBitVector, i::Int)
     (i < 1 || i > pv.length) && throw(BoundsError(pv, i))
     i1, i2 = Base.get_chunks_id(i)
-    PagedBit(Paged{UInt64}(pv.ptr.ptr + (i1-1)*sizeof(UInt64)), UInt64(1) << i2)
+    ManualBit(Manual{UInt64}(pv.ptr.ptr + (i1-1)*sizeof(UInt64)), UInt64(1) << i2)
 end
 
-function get_address(pv::Paged{PagedBitVector}, i::Int)
+function get_address(pv::Manual{ManualBitVector}, i::Int)
     get_address(unsafe_load(pv), i)
 end
 
-function Base.unsafe_load(pb::PagedBit)
+function Base.unsafe_load(pb::ManualBit)
     (unsafe_load(pb.ptr) & pb.mask) != 0
 end
 
-function Base.unsafe_store!(pb::PagedBit, v::Bool)
+function Base.unsafe_store!(pb::ManualBit, v::Bool)
     c = unsafe_load(pb.ptr)
     c = ifelse(v, c | pb.mask, c & ~pb.mask)
     unsafe_store!(pb.ptr, c)
 end
 
-function unsafe_resize!(pb::PagedBitVector, length::Int64)
+function unsafe_resize!(pb::ManualBitVector, length::Int64)
     @v pb.length = length
 end
 
-function Base.findprevnot(pb::PagedBitVector, start::Int)
+function Base.findprevnot(pb::ManualBitVector, start::Int)
     start > 0 || return 0
     start > length(pb) && throw(BoundsError(pb, start))
 
@@ -84,7 +82,7 @@ function Base.findprevnot(pb::PagedBitVector, start::Int)
     # return 0
 end
 
-function Base.findnextnot(pb::PagedBitVector, start::Int)
+function Base.findnextnot(pb::ManualBitVector, start::Int)
     start > 0 || throw(BoundsError(pb, start))
     start > length(pb) && return 0
 
@@ -100,18 +98,18 @@ end
 
 # array interface
 
-function Base.size(pv::PagedBitVector)
+function Base.size(pv::ManualBitVector)
     (pv.length,)
 end
 
-function Base.getindex(pv::PagedBitVector, i::Int)
+function Base.getindex(pv::ManualBitVector, i::Int)
     unsafe_load(get_address(pv, i))
 end
 
-function Base.setindex!(pv::PagedBitVector, v::Bool, i::Int)
+function Base.setindex!(pv::ManualBitVector, v::Bool, i::Int)
     unsafe_store!(get_address(pv, i), v)
 end
 
-function Base.IndexStyle(_::Type{PagedBitVector})
+function Base.IndexStyle(_::Type{ManualBitVector})
     Base.IndexLinear()
 end

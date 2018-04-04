@@ -1,6 +1,6 @@
-module TestPageds
+module TestManualMemory
 
-using Delve.Pageds
+using Delve.ManualMemory
 using Base.Test
 
 # basic sanity checks
@@ -10,7 +10,7 @@ struct Foo
     y::Float32 # tests conversion and alignment
 end
 
-foo = Paged{Foo}() # display should work in 0.7 TODO fix for 0.6?
+foo = Manual{Foo}() # display should work in 0.7 TODO fix for 0.6?
 @v foo.x = 1
 @test @v(foo.x) == 1
 @v foo.y = 2.5
@@ -24,7 +24,7 @@ foo = Paged{Foo}() # display should work in 0.7 TODO fix for 0.6?
 @test_throws ErrorException eval(:(@v foo.y == 2.5))
 @test_throws ErrorException eval(:(@a foo.y == 2.5))
 
-pv = PagedVector{Foo}(3)
+pv = ManualVector{Foo}(3)
 pv[2] = Foo(2, 2.2)
 @test pv[2] == Foo(2, 2.2)
 @test (@v pv[2]) == Foo(2, 2.2)
@@ -36,7 +36,7 @@ pv[3] = Foo(3, 3.3)
 # tests interior pointers
 @test (@a pv[2]).ptr == pv.ptr.ptr + sizeof(Foo)
 
-pbv = PagedBitVector(3)
+pbv = ManualBitVector(3)
 pbv[2] = true
 @test pbv[2] == true
 @test (@v pv[2]) == Foo(2, 2.2)
@@ -56,26 +56,26 @@ pbv2 = @a pbv[2]
 # sketch of paged pmas
 
 # struct PackedMemoryArray{K,V}
-#      keys::PagedVector{K}
-#      values::PagedVector{V}
-#      mask::PagedBitVector
+#      keys::ManualVector{K}
+#      values::ManualVector{V}
+#      mask::ManualBitVector
 #      count::Int
 #      #...other stuff
 # end
 #
-# function Paged{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
+# function Manual{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
 #     size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V) + Int64(ceil(length/8))
 #     ptr = Libc.malloc(size)
-#     pma = Paged{PackedMemoryArray{K,V}}(ptr)
-#     @v pma.keys = PagedVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-#     @v pma.values = PagedVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
-#     @v pma.mask = PagedBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
+#     pma = Manual{PackedMemoryArray{K,V}}(ptr)
+#     @v pma.keys = ManualVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
+#     @v pma.values = ManualVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
+#     @v pma.mask = ManualBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
 #     fill!((@v pma.mask), false)
 #     @v pma.count = 0
 #     pma
 # end
 #
-# pma = Paged{PackedMemoryArray{Int64, Float32}}(4)
+# pma = Manual{PackedMemoryArray{Int64, Float32}}(4)
 # @test (@v pma.count) == 0
 # @test (@v pma.keys.length) == 3
 # # tests fill!
@@ -92,7 +92,7 @@ pbv2 = @a pbv[2]
 # strings and unicode
 
 s = "普通话/普通話"
-p = PagedString(s)
+p = ManualString(s)
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
@@ -103,7 +103,7 @@ p = PagedString(s)
 # test right-to-left
 
 s = "سلام"
-p = PagedString(s)
+p = ManualString(s)
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
@@ -114,12 +114,12 @@ p = PagedString(s)
 # test string conversions
 
 @test isbits(p)
-@test reverse(p) isa RevString{PagedString}
+@test reverse(p) isa RevString{ManualString}
 @test String(p) isa String
 @test String(p) == s
 @test string(p) isa String
 
-include("test_packed_memory_array.jl")
-include("test_pagedalloc.jl")
+include("test_packed_memory_arrays.jl")
+include("test_manualalloc.jl")
 
 end

@@ -1,7 +1,7 @@
 using BenchmarkTools
-using Delve.Pageds
+using Delve.Manuals
 
-# Vector versus PagedVector
+# Vector versus ManualVector
 function fill_vector()
     a = Vector{Int}(10^5)
     for i in 1:10^5
@@ -10,7 +10,7 @@ function fill_vector()
 end
 
 function fill_paged_vector()
-    a = PagedVector{Int}(10^5)
+    a = ManualVector{Int}(10^5)
     for i in 1:10^5
         a[i] = i
     end
@@ -20,6 +20,6 @@ function vector_bench()
     println("Vector")
     @benchmark fill_vector()
 
-    println("PagedVector")
+    println("ManualVector")
     @benchmark fill_paged_vector()
 end
