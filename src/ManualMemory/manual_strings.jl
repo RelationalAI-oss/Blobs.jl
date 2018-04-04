@@ -1,63 +1,61 @@
-struct PagedString <: AbstractString
-    ptr::Paged{UInt8}
+struct ManualString <: AbstractString
+    ptr::Manual{UInt8}
     len::Int64 # in bytes
 end
 
 # creation
 
-function Base.unsafe_copy!(ps::PagedString, string::Union{PagedString, String})
+function Base.unsafe_copy!(ps::ManualString, string::Union{ManualString, String})
     @assert ps.len >= string.len
     unsafe_copy!(convert(Ptr{UInt8}, ps.ptr.ptr), pointer(string), string.len)
 end
 
-function Pageds.is_paged_type(x::Type{PagedString})
-    true
-end
+is_manual_type(x::Type{ManualString}) = true
 
-function pageddatasize(x::Type{PagedString}, length::Int64)
+function manual_datasize(x::Type{ManualString}, length::Int64)
     length
 end
 
-function PagedString(string::Union{PagedString, String})
-    ps = PagedString(Paged{UInt8}(pageddatasize(PagedString, string.len)), string.len)
+function ManualString(string::Union{ManualString, String})
+    ps = ManualString(Manual{UInt8}(manual_datasize(ManualString, string.len)), string.len)
     unsafe_copy!(ps, string)
     ps
 end
 
-function Base.String(ps::PagedString)
+function Base.String(ps::ManualString)
     unsafe_string(convert(Ptr{UInt8}, ps.ptr.ptr), ps.len)
 end
 
 # fields
 
-function Base.pointer(ps::PagedString)
+function Base.pointer(ps::ManualString)
     convert(Ptr{UInt8}, ps.ptr.ptr)
 end
 
 # string interface - this is largely copied from Base and will almost certainly break when we move to 0.7
 
-Base.sizeof(s::PagedString) = s.len
+Base.sizeof(s::ManualString) = s.len
 
-@inline function Base.codeunit(s::PagedString, i::Integer)
+@inline function Base.codeunit(s::ManualString, i::Integer)
     @boundscheck if (i < 1) | (i > s.len)
         throw(BoundsError(s,i))
     end
     unsafe_load(pointer(s),i)
 end
 
-Base.write(io::IO, s::PagedString) = unsafe_write(io, pointer(s), reinterpret(UInt, s.len))
+Base.write(io::IO, s::ManualString) = unsafe_write(io, pointer(s), reinterpret(UInt, s.len))
 
-function Base.cmp(a::PagedString, b::PagedString)
+function Base.cmp(a::ManualString, b::ManualString)
     c = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
               a, b, min(a.len,b.len))
     return c < 0 ? -1 : c > 0 ? +1 : cmp(a.len,b.len)
 end
 
-function Base.:(==)(a::PagedString, b::PagedString)
+function Base.:(==)(a::ManualString, b::ManualString)
     a.len == b.len && 0 == ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, a.len)
 end
 
-function Base.prevind(s::PagedString, i::Integer)
+function Base.prevind(s::ManualString, i::Integer)
     j = Int(i)
     e = s.len
     if j > e
@@ -70,7 +68,7 @@ function Base.prevind(s::PagedString, i::Integer)
     j
 end
 
-function Base.nextind(s::PagedString, i::Integer)
+function Base.nextind(s::ManualString, i::Integer)
     j = Int(i)
     if j < 1
         return 1
@@ -83,13 +81,13 @@ function Base.nextind(s::PagedString, i::Integer)
     j
 end
 
-Base.byte_string_classify(s::PagedString) =
+Base.byte_string_classify(s::ManualString) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), s, s.len)
 
-Base.isvalid(::Type{PagedString}, s::PagedString) = byte_string_classify(s) != 0
-Base.isvalid(s::PagedString) = isvalid(PagedString, s)
+Base.isvalid(::Type{ManualString}, s::ManualString) = byte_string_classify(s) != 0
+Base.isvalid(s::ManualString) = isvalid(ManualString, s)
 
-function Base.endof(s::PagedString)
+function Base.endof(s::ManualString)
     p = pointer(s)
     i = s.len
     while i > 0 && Base.is_valid_continuation(unsafe_load(p,i))
@@ -98,7 +96,7 @@ function Base.endof(s::PagedString)
     i
 end
 
-function Base.length(s::PagedString)
+function Base.length(s::ManualString)
     p = pointer(s)
     cnum = 0
     for i = 1:s.len
@@ -107,9 +105,9 @@ function Base.length(s::PagedString)
     cnum
 end
 
-Base.done(s::PagedString, state) = state > s.len
+Base.done(s::ManualString, state) = state > s.len
 
-@inline function Base.next(s::PagedString, i::Int)
+@inline function Base.next(s::ManualString, i::Int)
     @boundscheck if (i < 1) | (i > s.len)
         throw(BoundsError(s,i))
     end
@@ -121,7 +119,7 @@ Base.done(s::PagedString, state) = state > s.len
     return Base.slow_utf8_next(p, b, i, s.len)
 end
 
-function Base.reverseind(s::PagedString, i::Integer)
+function Base.reverseind(s::ManualString, i::Integer)
     j = s.len + 1 - i
     p = pointer(s)
     while Base.is_valid_continuation(unsafe_load(p,j))
@@ -130,10 +128,10 @@ function Base.reverseind(s::PagedString, i::Integer)
     return j
 end
 
-Base.isvalid(s::PagedString, i::Integer) =
+Base.isvalid(s::ManualString, i::Integer) =
     (1 <= i <= s.len) && !Base.is_valid_continuation(unsafe_load(pointer(s),i))
 
-function Base.getindex(s::PagedString, r::UnitRange{Int})
+function Base.getindex(s::ManualString, r::UnitRange{Int})
     isempty(r) && return ""
     i, j = first(r), last(r)
     l = s.len
@@ -151,7 +149,7 @@ function Base.getindex(s::PagedString, r::UnitRange{Int})
     unsafe_string(pointer(s,i), j-i+1)
 end
 
-function Base.search(s::PagedString, c::Char, i::Integer = 1)
+function Base.search(s::ManualString, c::Char, i::Integer = 1)
     if i < 1 || i > sizeof(s)
         i == sizeof(s) + 1 && return 0
         throw(BoundsError(s, i))
@@ -167,7 +165,7 @@ function Base.search(s::PagedString, c::Char, i::Integer = 1)
     end
 end
 
-function Base.search(a::PagedString, b::Union{Int8,UInt8}, i::Integer = 1)
+function Base.search(a::ManualString, b::Union{Int8,UInt8}, i::Integer = 1)
     if i < 1
         throw(BoundsError(a, i))
     end
@@ -180,7 +178,7 @@ function Base.search(a::PagedString, b::Union{Int8,UInt8}, i::Integer = 1)
     q == C_NULL ? 0 : Int(q-p+1)
 end
 
-function Base.rsearch(s::PagedString, c::Char, i::Integer = s.len)
+function Base.rsearch(s::ManualString, c::Char, i::Integer = s.len)
     c < Char(0x80) && return rsearch(s, c%UInt8, i)
     b = Base.first_utf8_byte(c)
     while true
@@ -190,7 +188,7 @@ function Base.rsearch(s::PagedString, c::Char, i::Integer = s.len)
     end
 end
 
-function Base.rsearch(a::PagedString, b::Union{Int8,UInt8}, i::Integer = s.len)
+function Base.rsearch(a::ManualString, b::Union{Int8,UInt8}, i::Integer = s.len)
     if i < 1
         return i == 0 ? 0 : throw(BoundsError(a, i))
     end
@@ -203,9 +201,9 @@ function Base.rsearch(a::PagedString, b::Union{Int8,UInt8}, i::Integer = s.len)
     q == C_NULL ? 0 : Int(q-p+1)
 end
 
-function Base.string(a::PagedString...)
+function Base.string(a::ManualString...)
     if length(a) == 1
-        return String(a[1]::PagedString)
+        return String(a[1]::ManualString)
     end
     n = 0
     for str in a

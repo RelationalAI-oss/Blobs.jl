@@ -38,9 +38,9 @@ struct TreeDimensions
 end
 
 struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
-    keys::PagedVector{K}
-    values::PagedVector{V}
-    mask::PagedBitVector
+    keys::ManualVector{K}
+    values::ManualVector{V}
+    mask::ManualBitVector
     count::Int
     capacity::Int
     max_capacity::Int
@@ -59,12 +59,10 @@ struct PackedMemoryArray{K,V} <: Compat.AbstractDict{K,V}
     # end
 end
 
-function Pageds.is_paged_type(x::Type{PackedMemoryArray{K,V}}) where {K,V}
-    true
-end
+is_manual_type(x::Type{PackedMemoryArray{K,V}}) where {K,V} = true
 
 "Initializes a `PackedMemoryArray{K,V}` pointing at an existing (or fresh) allocation"
-function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
+function pma_init(pma::Manual{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) where {K,V}
     if fresh
         fill!((@v pma.mask), false)
         @v pma.count = 0
@@ -79,24 +77,24 @@ function init_pma(pma::Paged{PackedMemoryArray{K,V}}, length::Int, fresh::Bool) 
 end
 
 "Allocate a new `PackedMemoryArray{T}` capable of storing length elements"
-function Paged{PackedMemoryArray{K,V}}(length::Int) where {K,V}
+function Manual{PackedMemoryArray{K,V}}(length::Int) where {K,V}
     if !ispow2(length)
         throw(ArgumentError("PackedMemoryArray length must be a power of two"))
     elseif length < pma_min_size
         throw(ArgumentError("PackedMemoryArray has minimum length $pma_min_size"))
     end
-    
-    pma = pagedalloc(PackedMemoryArray{K,V}, Libc.malloc,
+
+    pma = manual_alloc(PackedMemoryArray{K,V}, Libc.malloc,
             Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
 
-    init_pma(pma, length, true)
+    pma_init(pma, length, true)
 end
 
-function Paged{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
-    pma = pagedwire(Paged{PackedMemoryArray{K,V}}(ptr),
+function Manual{PackedMemoryArray{K,V}}(ptr::Ptr{Void}, length::Int) where {K,V}
+    pma = manual_wire(Manual{PackedMemoryArray{K,V}}(ptr),
             Val{(:keys, length)}, Val{(:values, length)} , Val{(:mask, length)})
 
-    init_pma(pma, length, true)
+    pma_init(pma, length, true)
 end
 
 # function PackedMemoryArray{K,V}(rts::Thresholds, kv) where {K,V}
@@ -139,12 +137,12 @@ function pma_maxcapacity(K, V, buffersize)
     prevpow2(capacity)
 end
 
-function pma_lower_threshold(p::Paged{PackedMemoryArray{K,V}}, level) where {K,V}
+function pma_lower_threshold(p::Manual{PackedMemoryArray{K,V}}, level) where {K,V}
     (@v p.rts.rh) - ((@v p.rts.rh) - (@v p.rts.r0)) *
         ((@v p.dims.height) - level) / (@v p.dims.height)
 end
 
-function pma_upper_threshold(p::Paged{PackedMemoryArray{K,V}}, level) where {K,V}
+function pma_upper_threshold(p::Manual{PackedMemoryArray{K,V}}, level) where {K,V}
     (@v p.rts.th) + ((@v p.rts.t0) - (@v p.rts.th)) *
         ((@v p.dims.height) - level) / (@v p.dims.height)
 end
@@ -153,7 +151,7 @@ end
 Finds a valid index near the midpoint of the open interval (left,right).
 Returns 0 if no valid index found.
 """
-function pma_find_midpoint(p::Paged{PackedMemoryArray{K,V}}, left, right) where {K,V}
+function pma_find_midpoint(p::Manual{PackedMemoryArray{K,V}}, left, right) where {K,V}
     if left < right-1
         c = left + div(right-left, 2)
         @assert c > left && c < right
@@ -169,7 +167,7 @@ function pma_find_midpoint(p::Paged{PackedMemoryArray{K,V}}, left, right) where 
     return 0
 end
 
-function pma_find_glb(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function pma_find_glb(p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     left = 0
     right = (@v p.capacity) + 1
     best = 0
@@ -190,7 +188,7 @@ function pma_find_glb(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
     return best
 end
 
-function pma_find_exact(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function pma_find_exact(p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     i = pma_find_glb(p, key)
     if i != 0 && (@v p.keys)[i] == key
         return i
@@ -203,13 +201,13 @@ struct Window
     right::Int
 end
 
-function pma_find_window(p::Paged{PackedMemoryArray{K,V}}, i, level) where {K,V}
+function pma_find_window(p::Manual{PackedMemoryArray{K,V}}, i, level) where {K,V}
     size = (@v p.dims.segment_size) * (1 << (level-1))
     start = size * div(i-1, size)
     Window(start+1, start+size)
 end
 
-function popcount(a::PagedBitVector, window)
+function popcount(a::ManualBitVector, window)
     # NOTE: placeholder implementation, could rewrite using count_ones which
     # exploits popcount instruction, but this means relying on internal details
     # of the BitVector implementation and is also fiddly, so punting until
@@ -229,13 +227,13 @@ end
 
 cap(window::Window) = window.right - window.left + 1
 
-function pma_density(p::Paged{PackedMemoryArray{K,V}}, window) where {K,V}
+function pma_density(p::Manual{PackedMemoryArray{K,V}}, window) where {K,V}
     load = popcount((@v p.mask), window)
     capacity = cap(window)
     load / capacity
 end
 
-function pma_move_item!(p::Paged{PackedMemoryArray{K,V}}, dst, src) where {K,V}
+function pma_move_item!(p::Manual{PackedMemoryArray{K,V}}, dst, src) where {K,V}
     @v p.keys[dst] = @v p.keys[src]
     @v p.values[dst] = @v p.values[src]
     @v p.mask[src] = false
@@ -283,7 +281,7 @@ end
 #     end
 # end
 
-function pma_pack_left!(p::Paged{PackedMemoryArray{K,V}}, window) where {K,V}
+function pma_pack_left!(p::Manual{PackedMemoryArray{K,V}}, window) where {K,V}
     count = 0
     dst = window.left
     for src in window.left:window.right
@@ -295,7 +293,7 @@ function pma_pack_left!(p::Paged{PackedMemoryArray{K,V}}, window) where {K,V}
     dst - window.left
 end
 
-function pma_spread_right!(p::Paged{PackedMemoryArray{K,V}}, window, count) where {K,V}
+function pma_spread_right!(p::Manual{PackedMemoryArray{K,V}}, window, count) where {K,V}
     moved = 0
     spacing = cap(window)/count
     for src in window.right:-1:window.left
@@ -307,12 +305,12 @@ function pma_spread_right!(p::Paged{PackedMemoryArray{K,V}}, window, count) wher
     end
 end
 
-function pma_sweep!(p::Paged{PackedMemoryArray{K,V}}, window) where {K,V}
+function pma_sweep!(p::Manual{PackedMemoryArray{K,V}}, window) where {K,V}
     count = pma_pack_left!(p, window)
     pma_spread_right!(p, window, count)
 end
 
-function pma_update_capacity!(p::Paged{PackedMemoryArray{K,V}}, length::Int) where {K,V}
+function pma_update_capacity!(p::Manual{PackedMemoryArray{K,V}}, length::Int) where {K,V}
     @v p.capacity = length
     @v p.dims = TreeDimensions(length)
     @v p.keys.length = length
@@ -320,7 +318,7 @@ function pma_update_capacity!(p::Paged{PackedMemoryArray{K,V}}, length::Int) whe
     @v p.mask.length = length
 end
 
-function pma_grow_or_shrink!(p::Paged{PackedMemoryArray{K,V}}, grow::Bool) where {K,V}
+function pma_grow_or_shrink!(p::Manual{PackedMemoryArray{K,V}}, grow::Bool) where {K,V}
     old_size = @v p.capacity
     if grow
         new_size = old_size*2
@@ -351,7 +349,7 @@ end
 #
 # end
 
-function pma_rebalance!(p::Paged{PackedMemoryArray{K,V}}, i, after_insert::Bool) where {K,V}
+function pma_rebalance!(p::Manual{PackedMemoryArray{K,V}}, i, after_insert::Bool) where {K,V}
     for level in 1:(@v p.dims.height)
         window = pma_find_window(p, i, level)
         d = pma_density(p, window)
@@ -391,19 +389,19 @@ function memmove!(dst, doff, src, soff, len)
     end
 end
 
-function pma_bump!(p::Paged{PackedMemoryArray{K,V}}, doff, soff, len) where {K,V}
+function pma_bump!(p::Manual{PackedMemoryArray{K,V}}, doff, soff, len) where {K,V}
     copy!((@v p.keys), doff, (@v p.keys), soff, len)
     copy!((@v p.values), doff, (@v p.values), soff, len)
     memmove!((@v p.mask), doff, (@v p.mask), soff, len)
 end
 
-function pma_insert_at!(p::Paged{PackedMemoryArray{K,V}}, i, key, value) where {K,V}
+function pma_insert_at!(p::Manual{PackedMemoryArray{K,V}}, i, key, value) where {K,V}
     @v p.keys[i] = key
     @v p.values[i] = value
     @v p.mask[i] = true
 end
 
-function pma_insert_after!(p::Paged{PackedMemoryArray{K,V}}, i, key, value) where {K,V}
+function pma_insert_after!(p::Manual{PackedMemoryArray{K,V}}, i, key, value) where {K,V}
     @assert 0 ≤ i ≤ (@v p.capacity)
     # Search for empty space to the right of i
     j = Base.findnextnot((@v p.mask), i+1)
@@ -424,7 +422,7 @@ function pma_insert_after!(p::Paged{PackedMemoryArray{K,V}}, i, key, value) wher
     pma_rebalance!(p, i, true)
 end
 
-function maxlength(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+function maxlength(p::Manual{PackedMemoryArray{K,V}}) where {K,V}
     @v p.max_capacity
 end
 
@@ -443,7 +441,7 @@ end
 #              hash, , ValueIterator, convert, copy,
 #              merge
 
-function Base.get(f::Function, p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function Base.get(f::Function, p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     i = pma_find_exact(p, key)
     if i == 0
         f()
@@ -452,7 +450,7 @@ function Base.get(f::Function, p::Paged{PackedMemoryArray{K,V}}, key) where {K,V
     end
 end
 
-function Base.get!(f::Function, p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function Base.get!(f::Function, p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     i = find_exact(p, key)
     if i == 0
         value = f()
@@ -466,7 +464,7 @@ end
 Base.getkey(p::PackedMemoryArray{K,V}, key, default) where {K,V} =
     Base.get(p, key, () -> default)
 
-function Base.setindex!(p::Paged{PackedMemoryArray{K,V}}, value, key) where {K,V}
+function Base.setindex!(p::Manual{PackedMemoryArray{K,V}}, value, key) where {K,V}
     i = pma_find_glb(p, key)
     if i > 0 && (@v p.keys[i]) == key
         @v p.values[i] = value
@@ -478,7 +476,7 @@ function Base.setindex!(p::Paged{PackedMemoryArray{K,V}}, value, key) where {K,V
     p
 end
 
-function Base.delete!(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function Base.delete!(p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     i = pma_find_exact(p, key)
     if i != 0
         @v p.mask[i] = false
@@ -488,7 +486,7 @@ function Base.delete!(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
     p
 end
 
-function Base.getindex(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function Base.getindex(p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     i = pma_find_exact(p, key)
     if i == 0
         throw(KeyError(key))
@@ -496,27 +494,27 @@ function Base.getindex(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
     @v p.values[i]
 end
 
-function Base.haskey(p::Paged{PackedMemoryArray{K,V}}, key) where {K,V}
+function Base.haskey(p::Manual{PackedMemoryArray{K,V}}, key) where {K,V}
     pma_find_exact(p, key) != 0
 end
 
-Base.isempty(p::Paged{PackedMemoryArray{K,V}}) where {K,V} = (@v p.count) == 0
+Base.isempty(p::Manual{PackedMemoryArray{K,V}}) where {K,V} = (@v p.count) == 0
 
-Base.push!(p::Paged{PackedMemoryArray{K,V}}, kv) where {K,V} =
+Base.push!(p::Manual{PackedMemoryArray{K,V}}, kv) where {K,V} =
     Base.setindex!(p, kv[2], kv[1])
 
 # Custom iterator
-Base.start(p::Paged{PackedMemoryArray{K,V}}) where {K,V} =
+Base.start(p::Manual{PackedMemoryArray{K,V}}) where {K,V} =
     findnext((@v p.mask), 1)
-Base.next(p::Paged{PackedMemoryArray{K,V}}, state) where {K,V} =
+Base.next(p::Manual{PackedMemoryArray{K,V}}, state) where {K,V} =
     ((@v p.keys[state]) => (@v p.values[state])), findnext((@v p.mask), state+1)
-Base.done(p::Paged{PackedMemoryArray{K,V}}, state) where {K,V} = state == 0
-Base.eltype(::Type{Paged{PackedMemoryArray{K,V}}}) where {K,V} = Pair{K,V}
-Base.length(p::Paged{PackedMemoryArray{K,V}}) where {K,V} = @v p.count
-# Base.convert(::Type{Array}, p::Paged{PackedMemoryArray{K,V}}{K,V}) where {K,V} =
+Base.done(p::Manual{PackedMemoryArray{K,V}}, state) where {K,V} = state == 0
+Base.eltype(::Type{Manual{PackedMemoryArray{K,V}}}) where {K,V} = Pair{K,V}
+Base.length(p::Manual{PackedMemoryArray{K,V}}) where {K,V} = @v p.count
+# Base.convert(::Type{Array}, p::Manual{PackedMemoryArray{K,V}}{K,V}) where {K,V} =
 #     Pair{K,V}[kv for kv in p]
 
-function Base.empty!(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+function Base.empty!(p::Manual{PackedMemoryArray{K,V}}) where {K,V}
     pma_update_capacity!(p, pma_min_size)
     fill!((@v p.mask), false)
     @v p.count = 0
@@ -524,7 +522,7 @@ function Base.empty!(p::Paged{PackedMemoryArray{K,V}}) where {K,V}
     p
 end
 
-function showfirst(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
+function showfirst(io::IO, p::Manual{PackedMemoryArray{K,V}}, count) where {K,V}
     shown = 0
     for kv in p
         print(io, "\n $kv")
@@ -535,7 +533,7 @@ function showfirst(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
     end
 end
 
-function showlast(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
+function showlast(io::IO, p::Manual{PackedMemoryArray{K,V}}, count) where {K,V}
     mask = @v p.mask
     kvs = Vector{Pair{K,V}}()
     i = (@v p.capacity) + 1
@@ -553,7 +551,7 @@ function showlast(io::IO, p::Paged{PackedMemoryArray{K,V}}, count) where {K,V}
     end
 end
 
-function Base.show(io::IO, p::Paged{PackedMemoryArray{K,V}}) where {K,V}
+function Base.show(io::IO, p::Manual{PackedMemoryArray{K,V}}) where {K,V}
     print(io, "$(@v p.count)-element PackedMemoryArray{$K,$V} (with $(@v p.max_capacity)-element max capacity))")
     if (@v p.count) == 0
         return
