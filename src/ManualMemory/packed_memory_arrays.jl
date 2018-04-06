@@ -426,6 +426,18 @@ function maxlength(p::Manual{PackedMemoryArray{K,V}}) where {K,V}
     @v p.max_capacity
 end
 
+# copying, with correct handling of overlapping regions
+# TODO more efficient implementation
+function Base.copy!(dest::Manual{PackedMemoryArray{K,V}}, doff::Int,
+    src::Manual{PackedMemoryArray{K,V}}, soff::Int, n::Int) where {K,V}
+
+    if doff < soff
+        for i in 0:n-1 dest[doff+i] = src[soff+i] end
+    else
+        for i in n-1:-1:0 dest[doff+i] = src[soff+i] end
+    end
+end
+
 # AbstractDict methods (don't forget get(dict, key, default); haskey())
 # import Base: haskey, get, get!, getkey, delete!, push!, pop!, empty!,
 #              setindex!, getindex, length, isempty, start,
