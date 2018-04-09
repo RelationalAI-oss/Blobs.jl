@@ -343,6 +343,6 @@ nothing # hide
 end
 
 export Manual, ManualVector, ManualBitVector, ManualString, PackedMemoryArray, @a, @v
-export manual_size, manual_wire, manual_alloc
+export manual_size, manual_wire, manual_alloc, maxlength
 
 end
