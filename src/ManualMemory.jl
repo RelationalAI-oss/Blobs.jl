@@ -1,12 +1,15 @@
 module ManualMemory
 
-using Delve.Util
+macro splice(iterator, body)
+  @assert iterator.head == :call
+  @assert iterator.args[1] == :in
+  Expr(:..., :(($(esc(body)) for $(esc(iterator.args[2])) in $(esc(iterator.args[3])))))
+end
 
 """
 A pointer to a `T` in some manually managed region of memory.
-
-TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 """
+# TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 struct Manual{T}
     ptr::Ptr{Void}
 
@@ -167,7 +170,6 @@ is_manual_type(x::Type{Manual{T}}) where {T} = true
 include("manual_vectors.jl")
 include("manual_bit_vectors.jl")
 include("manual_strings.jl")
-include("packed_memory_arrays.jl")
 
 """
 Extracts the field initializer data from `Val` type
@@ -289,7 +291,7 @@ Allocates and correctly initializes the pointers in a type that is composed
 of one or more `Manual` data members.
 
 ```@example
-using Delve.ManualMemory # hide
+using ManualMemory # hide
 
 "Sample data structure, mixing primitive and manual fields"
 struct Foo
@@ -342,7 +344,7 @@ nothing # hide
     manual_wire(T, alloc_page_block, field_inits)
 end
 
-export Manual, ManualVector, ManualBitVector, ManualString, PackedMemoryArray, @a, @v
+export Manual, ManualVector, ManualBitVector, ManualString, @a, @v
 export manual_size, manual_wire, manual_alloc, maxlength
 
 end
