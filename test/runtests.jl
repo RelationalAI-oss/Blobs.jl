@@ -75,7 +75,7 @@ function Manual{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
     pma
 end
 
-pma = Manual{PackedMemoryArray{Int64, Float32}}(4)
+pma = Manual{PackedMemoryArray{Int64, Float32}}(3)
 @test (@v pma.count) == 0
 @test (@v pma.keys.length) == 3
 # tests fill!
