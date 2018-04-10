@@ -1,6 +1,6 @@
 module TestManualMemory
 
-using Delve.ManualMemory
+using ManualMemory
 using Base.Test
 
 # basic sanity checks

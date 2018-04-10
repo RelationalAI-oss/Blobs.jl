@@ -1,16 +1,13 @@
-using Base.Test
-using Delve
-using Delve.ManualMemory
-
 module TestManualalloc
-import Delve.ManualMemory
+
+using Base.Test
+using ManualMemory
 
 struct Bar
     a::Int
     b::ManualMemory.ManualBitVector
     c::Bool
     d::ManualMemory.ManualVector{Float64}
-end
 end
 
 Bar = TestManualalloc.Bar
@@ -34,3 +31,5 @@ bar = ManualMemory.manual_alloc(Bar, memalloc, Val{(:b, blen)}, Val{(:d,dlen)})
 @test (@v bar.c) == c
 @test (length(@v bar.b)) == 10
 @test (length(@v bar.d)) == 20
+
+end

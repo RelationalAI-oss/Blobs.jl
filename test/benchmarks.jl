@@ -1,5 +1,5 @@
 using BenchmarkTools
-using Delve.Manuals
+using ManualMemory
 
 # Vector versus ManualVector
 function fill_vector()
