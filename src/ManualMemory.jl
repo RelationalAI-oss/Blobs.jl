@@ -129,6 +129,7 @@ end
         quote
             $(Expr(:meta, :inline))
             unsafe_store!(convert(Ptr{T}, get_ptr(man)), value)
+            value
         end
     else
         # is a composite type - recursively store its fields
@@ -138,6 +139,7 @@ end
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
                 unsafe_store!(get_address(man, $(Val{field})), value.$field)
             end)
+            value
         end
     end
 end
