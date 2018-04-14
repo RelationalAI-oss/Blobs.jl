@@ -1,6 +1,14 @@
 # ManualMemory
 
-A wrapper around `Libc.malloc` and `Ptr` that handles field access and bounds checking.
+ManualMemory makes it easy to lay out complex data-structures within a single memory region. Data-structures built using this library:
+
+* are relocatable - internal pointers are converted to offsets, so the entire memory region can be written to / read from disk or sent over the network without pointer patching
+* require no deserialization - they can be directly read/written without first copying the data into a Julia-native data-structure
+* require no heap allocation - field access is just pointer arithmetic and every field read/write returns an `isbits` type which can stored on the stack
+
+This makes them ideal for implementing out-of-core data-structures or for DMA to co-processors.
+
+WARNING: This library is currently not memory-safe. Improper usage can cause segfaults or memory corruption. Upcoming versions will fix this.
 
 ## Usage
 
