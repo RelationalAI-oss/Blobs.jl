@@ -14,15 +14,11 @@ function ManualVector{T}(ptr::Ptr{Void}, length::Int64) where {T}
     ManualVector{T}(Manual{T}(ptr), length)
 end
 
-is_manual_type(x::Type{ManualVector{T}}) where {T} = true
-
-function manual_datasize(x::Type{ManualVector{T}}, length::Int64) where {T}
-    sizeof(T) * length
-end
+alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
 "Allocate a new `ManualVector{T}`"
 function ManualVector{T}(length::Int64) where {T}
-    ManualVector{T}(Manual{T}(manual_datasize(ManualVector{T}, length)), length)
+    ManualVector{T}(Manual{T}(alloc_size(ManualVector{T}, length)), length)
 end
 
 @inline function get_address(pv::ManualVector{T}, i::Int) where {T}

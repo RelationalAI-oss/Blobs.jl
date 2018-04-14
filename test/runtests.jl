@@ -119,6 +119,28 @@ p = ManualString(s)
 @test String(p) == s
 @test string(p) isa String
 
-include("test_manualalloc.jl")
+# test manual_alloc
+
+struct Bar
+    a::Int
+    b::ManualBitVector
+    c::Bool
+    d::ManualVector{Float64}
+end
+
+blen = 10
+dlen = 20
+c = false
+
+@test_throws AssertionError manual_alloc(Bar, Libc.malloc, Val{(:b, blen)}, Val{(:c,c)}, Val{(:d,dlen)})
+
+@test_throws AssertionError manual_alloc(Bar, Libc.malloc, Val{(:b, blen)})
+
+bar = manual_alloc(Bar, Libc.malloc, Val{(:b, blen)}, Val{(:d,dlen)})
+@v bar.c = c
+
+@test (@v bar.c) == c
+@test (length(@v bar.b)) == 10
+@test (length(@v bar.d)) == 20
 
 end
