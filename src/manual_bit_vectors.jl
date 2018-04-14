@@ -14,15 +14,11 @@ function ManualBitVector(ptr::Ptr{Void}, length::Int64)
     ManualBitVector(Manual{UInt64}(ptr), length)
 end
 
-is_manual_type(x::Type{ManualBitVector}) = true
-
-function manual_datasize(x::Type{ManualBitVector}, length::Int64)
-    UInt64(ceil(length / sizeof(UInt64)))
-end
+alloc_size(::Type{ManualBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
 
 "Allocate a new `ManualBitVector`"
 function ManualBitVector(length::Int64)
-    size = manual_datasize(ManualBitVector, length)
+    size = alloc_size(ManualBitVector, length)
     ManualBitVector(Manual{UInt64}(size), length)
 end
 
