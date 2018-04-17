@@ -19,6 +19,9 @@ struct Manual{T}
     end
 end
 
+needs_alloc_size(::Type{Manual{T}}) where T = needs_alloc_size(T)
+alloc_size(::Type{Manual{T}}, length::Int64) where T = alloc_size(T, length)
+
 get_ptr(man::Manual{T}) where {T} = man.ptr
 
 "Allocate `size` bytes for an unintialized Manual{T}"

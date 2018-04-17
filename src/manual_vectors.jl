@@ -14,6 +14,7 @@ function ManualVector{T}(ptr::Ptr{Void}, length::Int64) where {T}
     ManualVector{T}(Manual{T}(ptr), length)
 end
 
+needs_alloc_size(::Type{ManualVector{T}}) where {T} = true
 alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
 "Allocate a new `ManualVector{T}`"

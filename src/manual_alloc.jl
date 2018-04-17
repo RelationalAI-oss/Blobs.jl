@@ -1,8 +1,10 @@
+needs_alloc_size(::Type{T}) where {T} = false
+
 function gen_manual_wire(T, field_lengths)
     unpack(::Type{Type{Val{field_length}}}) where {field_length} = field_length
     field_lengths = Dict(map(unpack, field_lengths))
-    sized_fields = Set((field for field in fieldnames(T) if method_exists(alloc_size, Tuple{Type{fieldtype(T, field)}, Int64})))
-    
+    sized_fields = Set((field for field in fieldnames(T) if needs_alloc_size(fieldtype(T, field))))
+
     for (field, length) in field_lengths
         @assert field in fieldnames(T) "$T has no field $field"
         @assert field in sized_fields "Field $field of $T does not implement alloc_size and so can't be given a length"
@@ -91,4 +93,3 @@ nothing # hide
 - `size_inits`: the list of size initializer. You can pass several argments of type `Val{Tuple{Symbol, Int64}}`. This list should only include all the `Manual` fields. Each argument is a tuple of field `Symbol` and its `length` argument wrapped inside a `Val`.
 """
 :manual_alloc
-
