@@ -19,9 +19,6 @@ struct Manual{T}
     end
 end
 
-needs_alloc_size(::Type{Manual{T}}) where T = needs_alloc_size(T)
-alloc_size(::Type{Manual{T}}, length::Int64) where T = alloc_size(T, length)
-
 "Allocate `size` bytes for an unintialized Manual{T}"
 Manual{T}(size::Integer) where {T} = Manual{T}(Libc.malloc(size))
 
