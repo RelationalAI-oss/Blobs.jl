@@ -22,8 +22,6 @@ end
 needs_alloc_size(::Type{Manual{T}}) where T = needs_alloc_size(T)
 alloc_size(::Type{Manual{T}}, length::Int64) where T = alloc_size(T, length)
 
-get_ptr(man::Manual{T}) where {T} = man.ptr
-
 "Allocate `size` bytes for an unintialized Manual{T}"
 Manual{T}(size::Integer) where {T} = Manual{T}(Libc.malloc(size))
 
@@ -96,7 +94,7 @@ macro v(expr)
 end
 
 function get_address(man::Manual{Manual{T}}, ::Type{Val{field}}) where {T, field}
-    get_address(Manual{T}(get_ptr(man)), Val{field})
+    get_address(Manual{T}(man.ptr), Val{field})
 end
 
 @generated function get_address(man::Manual{T}, ::Type{Val{field}}) where {T, field}
@@ -104,7 +102,7 @@ end
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Manual{$(fieldtype(T, i))}(get_ptr(man) + $(fieldoffset(T, i)))
+        Manual{$(fieldtype(T, i))}(man.ptr + $(fieldoffset(T, i)))
     end
 end
 
@@ -113,7 +111,7 @@ end
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_load(convert(Ptr{T}, get_ptr(man)))
+            unsafe_load(convert(Ptr{T}, man.ptr))
         end
     else
         # is a composite type - recursively load its fields
@@ -130,7 +128,7 @@ end
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_store!(convert(Ptr{T}, get_ptr(man)), value)
+            unsafe_store!(convert(Ptr{T}, man.ptr), value)
             value
         end
     else
@@ -155,12 +153,12 @@ end
 
 @inline function Base.unsafe_load(man::Manual{Manual{T}}) where {T}
     offset = unsafe_load(Manual{UInt64}(man.ptr))
-    Manual{T}(get_ptr(man) + offset)
+    Manual{T}(man.ptr + offset)
 end
 
 @inline function Base.unsafe_store!(man::Manual{Manual{T}}, value::Manual{T}) where {T}
-    offset = value.ptr - get_ptr(man)
-    unsafe_store!(Manual{UInt64}(get_ptr(man)), offset)
+    offset = value.ptr - man.ptr
+    unsafe_store!(Manual{UInt64}(man.ptr), offset)
 end
 
 include("manual_vectors.jl")
