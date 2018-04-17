@@ -1,3 +1,16 @@
+"""
+A pointer to a `T` in some manually managed region of memory.
+"""
+# TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
+struct Manual{T}
+    ptr::Ptr{Void}
+
+    function Manual{T}(ptr::Ptr{Void}) where {T}
+        @assert isbits(T)
+        new(ptr)
+    end
+end
+
 function rewrite_address(expr)
     if !(expr isa Expr)
         esc(expr)
@@ -61,28 +74,6 @@ NOTE macros bind tightly, so:
 """
 macro v(expr)
     rewrite_value(expr)
-end
-
-"""
-A pointer to a `T` in some manually managed region of memory.
-"""
-# TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
-struct Manual{T}
-    ptr::Ptr{Void}
-
-    function Manual{T}(ptr::Ptr{Void}) where {T}
-        @assert isbits(T)
-        new(ptr)
-    end
-end
-
-alloc_size(::Type{Manual{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
-
-function init(ptr::Ptr{Void}, man::Manual{Manual{T}}, args...) where T
-    @v man.ptr = ptr
-    t = Manual{T}(ptr)
-    t_ptr = ptr + sizeof(T)
-    init(t, t_ptr, args...)
 end
 
 function get_address(man::Manual{Manual{T}}, ::Type{Val{field}}) where {T, field}

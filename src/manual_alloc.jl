@@ -30,6 +30,47 @@ function init(ptr::Ptr{Void}, man::Manual{T}) where T
     ptr
 end
 
+alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
+
+function init(ptr::Ptr{Void}, pv::Manual{ManualVector{T}}, length::Int64) where T
+    @v pv.ptr = Manual{T}(ptr)
+    @v pv.length = length
+    ptr + alloc_size(ManualVector{T}, length)
+end
+
+alloc_size(::Type{ManualBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
+
+function init(ptr::Ptr{Void}, pv::Manual{ManualBitVector}, length::Int64)
+    @v pv.ptr = Manual{UInt64}(ptr)
+    @v pv.length = length
+    ptr + alloc_size(ManualBitVector, length)
+end
+
+alloc_size(::Type{ManualString}, length::Int64) = length
+
+function init(ptr::Ptr{Void}, ps::Manual{ManualString}, length::Int64)
+    @v ps.ptr = Manual{UInt8}(ptr)
+    @v ps.len = length
+    ptr + alloc_size(ManualString, length)
+end
+
+alloc_size(::Type{ManualString}, string::Union{String, ManualString}) = string.len
+
+function init(ptr::Ptr{Void}, ps::Manual{ManualString}, string::Union{String, ManualString})
+    ptr = init(ptr, ps, string.len)
+    unsafe_copy!((@v ps), string)
+    ptr
+end
+
+alloc_size(::Type{Manual{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
+
+function init(ptr::Ptr{Void}, man::Manual{Manual{T}}, args...) where T
+    @v man.ptr = ptr
+    t = Manual{T}(ptr)
+    t_ptr = ptr + sizeof(T)
+    init(t, t_ptr, args...)
+end
+
 """
     malloc(::Type{T}, args...)::Manual{T} where T
 

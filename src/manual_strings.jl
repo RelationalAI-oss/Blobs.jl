@@ -10,22 +10,6 @@ function Base.unsafe_copy!(ps::ManualString, string::Union{ManualString, String}
     unsafe_copy!(convert(Ptr{UInt8}, ps.ptr.ptr), pointer(string), string.len)
 end
 
-alloc_size(::Type{ManualString}, length::Int64) = length
-
-function init(ptr::Ptr{Void}, ps::Manual{ManualString}, length::Int64)
-    @v ps.ptr = Manual{UInt8}(ptr)
-    @v ps.len = length
-    ptr + alloc_size(ManualString, length)
-end
-
-alloc_size(::Type{ManualString}, string::Union{String, ManualString}) = string.len
-
-function init(ptr::Ptr{Void}, ps::Manual{ManualString}, string::Union{String, ManualString})
-    ptr = init(ptr, ps, string.len)
-    unsafe_copy!((@v ps), string)
-    ptr
-end
-
 function Base.String(ps::ManualString)
     unsafe_string(convert(Ptr{UInt8}, ps.ptr.ptr), ps.len)
 end

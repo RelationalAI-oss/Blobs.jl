@@ -9,14 +9,6 @@ struct ManualVector{T} <: AbstractArray{T, 1}
     end
 end
 
-alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
-
-function init(ptr::Ptr{Void}, pv::Manual{ManualVector{T}}, length::Int64) where T
-    @v pv.ptr = Manual{T}(ptr)
-    @v pv.length = length
-    ptr + alloc_size(ManualVector{T}, length)
-end
-
 @inline function get_address(pv::ManualVector{T}, i::Int) where {T}
     (0 < i <= pv.length) || throw(BoundsError(pv, i))
     Manual{T}(pv.ptr.ptr + (i-1)*sizeof(T))

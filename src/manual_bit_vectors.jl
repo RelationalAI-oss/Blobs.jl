@@ -9,14 +9,6 @@ struct ManualBit
     mask::UInt64
 end
 
-alloc_size(::Type{ManualBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
-
-function init(ptr::Ptr{Void}, pv::Manual{ManualBitVector}, length::Int64)
-    @v pv.ptr = Manual{UInt64}(ptr)
-    @v pv.length = length
-    ptr + alloc_size(ManualBitVector, length)
-end
-
 function get_address(pv::ManualBitVector, i::Int)
     (i < 1 || i > pv.length) && throw(BoundsError(pv, i))
     i1, i2 = Base.get_chunks_id(i)
