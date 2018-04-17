@@ -36,8 +36,10 @@ end
 Allocate and initialize a new `Manual{T}`.
 """
 function malloc(::Type{T}, args...)::Manual{T} where T
-    ptr = Libc.malloc(alloc_size(T, args...))
+    size = sizeof(T) + alloc_size(T, args...)
+    ptr = Libc.malloc(size)
     man = Manual{T}(ptr)
-    init(man, args...)
+    end_ptr = init(ptr + sizeof(T), man, args...)
+    @assert end_ptr - ptr == size
     man
 end
