@@ -1,6 +1,7 @@
 module TestManualMemory
 
 using ManualMemory
+import ManualMemory; const MM = ManualMemory
 using Base.Test
 
 # basic sanity checks
@@ -10,7 +11,7 @@ struct Foo
     y::Float32 # tests conversion and alignment
 end
 
-foo = Manual{Foo}() # display should work in 0.7 TODO fix for 0.6?
+foo = Manual{Foo}(Libc.malloc(sizeof(Foo))) # display should work in 0.7 TODO fix for 0.6?
 @v foo.x = 1
 @test @v(foo.x) == 1
 @v foo.y = 2.5
@@ -24,7 +25,8 @@ foo = Manual{Foo}() # display should work in 0.7 TODO fix for 0.6?
 @test_throws ErrorException eval(:(@v foo.y == 2.5))
 @test_throws ErrorException eval(:(@a foo.y == 2.5))
 
-pv = ManualVector{Foo}(3)
+mpv = MM.malloc(ManualVector{Foo}, 3)
+pv = @v mpv
 pv[2] = Foo(2, 2.2)
 @test pv[2] == Foo(2, 2.2)
 @test (@v pv[2]) == Foo(2, 2.2)
@@ -36,7 +38,8 @@ pv[3] = Foo(3, 3.3)
 # tests interior pointers
 @test (@a pv[2]).ptr == pv.ptr.ptr + sizeof(Foo)
 
-pbv = ManualBitVector(3)
+mpbv = MM.malloc(ManualBitVector, 3)
+pbv = @v mpbv
 pbv[2] = true
 @test pbv[2] == true
 @test (@v pv[2]) == Foo(2, 2.2)
@@ -53,46 +56,11 @@ pbv2 = @a pbv[2]
 @test (@v pbv2) == true
 @test pbv[2] == true
 
-# sketch of paged pmas
-
-struct PackedMemoryArray{K,V}
-     keys::ManualVector{K}
-     values::ManualVector{V}
-     mask::ManualBitVector
-     count::Int
-     #...other stuff
-end
-
-function Manual{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
-    size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V) + Int64(ceil(length/8))
-    ptr = Libc.malloc(size)
-    pma = Manual{PackedMemoryArray{K,V}}(ptr)
-    @v pma.keys = ManualVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-    @v pma.values = ManualVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
-    @v pma.mask = ManualBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
-    fill!((@v pma.mask), false)
-    @v pma.count = 0
-    pma
-end
-
-pma = Manual{PackedMemoryArray{Int64, Float32}}(3)
-@test (@v pma.count) == 0
-@test (@v pma.keys.length) == 3
-# tests fill!
-@test !any(@v pma.mask)
-# tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{UInt64}, pma.ptr), 1) == sizeof(PackedMemoryArray{Int64, Float32})
-# tests nested interior pointers
-pma2 = @a pma.mask[2]
-@test (@v pma2) == false
-@v pma2 = true
-@test (@v pma2) == true
-@test (@v pma.mask[2]) == true
-
 # strings and unicode
 
 s = "普通话/普通話"
-p = ManualString(s)
+mp = MM.malloc(ManualString, s)
+p = @v mp
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
@@ -103,7 +71,8 @@ p = ManualString(s)
 # test right-to-left
 
 s = "سلام"
-p = ManualString(s)
+mp = MM.malloc(ManualString, s)
+p = @v mp
 @test p == s
 @test repr(p) == repr(s)
 @test collect(p) == collect(s)
@@ -119,7 +88,47 @@ p = ManualString(s)
 @test String(p) == s
 @test string(p) isa String
 
-# test manual_alloc
+# sketch of paged pmas
+
+struct PackedMemoryArray{K,V}
+     keys::ManualVector{K}
+     values::ManualVector{V}
+     mask::ManualBitVector
+     count::Int
+     #...other stuff
+end
+
+function MM.alloc_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
+    T = PackedMemoryArray{K,V}
+    +(MM.alloc_size(fieldtype(T, :keys), length),
+      MM.alloc_size(fieldtype(T, :values), length),
+      MM.alloc_size(fieldtype(T, :mask), length))
+  end
+
+function MM.init(ptr::Ptr{Void}, pma::Manual{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
+    ptr = MM.init(ptr, (@a pma.keys), length)
+    ptr = MM.init(ptr, (@a pma.values), length)
+    ptr = MM.init(ptr, (@a pma.mask), length)
+    fill!((@v pma.mask), false)
+    @v pma.count = 0
+    ptr
+end
+
+pma = MM.malloc(PackedMemoryArray{Int64, Float32}, 3)
+@test (@v pma.count) == 0
+@test (@v pma.keys.length) == 3
+# tests fill!
+@test !any(@v pma.mask)
+# tests pointer <-> offset conversion
+@test unsafe_load(convert(Ptr{UInt64}, pma.ptr), 1) == sizeof(PackedMemoryArray{Int64, Float32})
+# tests nested interior pointers
+pma2 = @a pma.mask[2]
+@test (@v pma2) == false
+@v pma2 = true
+@test (@v pma2) == true
+@test (@v pma.mask[2]) == true
+
+# test api works ok with varying sizes
 
 struct Bar
     a::Int
@@ -128,19 +137,23 @@ struct Bar
     d::ManualVector{Float64}
 end
 
-blen = 10
-dlen = 20
-c = false
+function MM.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64)
+    T = Bar
+    +(MM.alloc_size(fieldtype(T, :b), b_len),
+      MM.alloc_size(fieldtype(T, :d), d_len))
+  end
 
-@test_throws AssertionError manual_alloc(Bar, Libc.malloc, Val{(:b, blen)}, Val{(:c,c)}, Val{(:d,dlen)})
+function MM.init(ptr::Ptr{Void}, bar::Manual{Bar}, b_len::Int64, c::Bool, d_len::Int64)
+    ptr = MM.init(ptr, (@a bar.b), b_len)
+    ptr = MM.init(ptr, (@a bar.d), d_len)
+    @v bar.c = c
+    ptr
+end
 
-@test_throws AssertionError manual_alloc(Bar, Libc.malloc, Val{(:b, blen)})
+bar = MM.malloc(Bar, 10, false, 20)
 
-bar = manual_alloc(Bar, Libc.malloc, Val{(:b, blen)}, Val{(:d,dlen)})
-@v bar.c = c
-
-@test (@v bar.c) == c
-@test (length(@v bar.b)) == 10
-@test (length(@v bar.d)) == 20
+@test (@v bar.c) == false
+@test length(@v bar.b) == 10
+@test length(@v bar.d) == 20
 
 end

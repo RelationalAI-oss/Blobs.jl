@@ -9,17 +9,12 @@ struct ManualVector{T} <: AbstractArray{T, 1}
     end
 end
 
-"Create a `ManualVector{T}` pointing at an existing allocation"
-function ManualVector{T}(ptr::Ptr{Void}, length::Int64) where {T}
-    ManualVector{T}(Manual{T}(ptr), length)
-end
-
-needs_alloc_size(::Type{ManualVector{T}}) where {T} = true
 alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
-"Allocate a new `ManualVector{T}`"
-function ManualVector{T}(length::Int64) where {T}
-    ManualVector{T}(Manual{T}(alloc_size(ManualVector{T}, length)), length)
+function init(ptr::Ptr{Void}, pv::Manual{ManualVector{T}}, length::Int64) where T
+    @v pv.ptr = Manual{T}(ptr)
+    @v pv.length = length
+    ptr + alloc_size(ManualVector{T}, length)
 end
 
 @inline function get_address(pv::ManualVector{T}, i::Int) where {T}

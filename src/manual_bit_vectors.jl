@@ -9,18 +9,12 @@ struct ManualBit
     mask::UInt64
 end
 
-"Create a `ManualBitVector` pointing at an existing allocation"
-function ManualBitVector(ptr::Ptr{Void}, length::Int64)
-    ManualBitVector(Manual{UInt64}(ptr), length)
-end
-
-needs_alloc_size(::Type{ManualBitVector}) = true
 alloc_size(::Type{ManualBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
 
-"Allocate a new `ManualBitVector`"
-function ManualBitVector(length::Int64)
-    size = alloc_size(ManualBitVector, length)
-    ManualBitVector(Manual{UInt64}(size), length)
+function init(ptr::Ptr{Void}, pv::Manual{ManualBitVector}, length::Int64)
+    @v pv.ptr = Manual{UInt64}(ptr)
+    @v pv.length = length
+    ptr + alloc_size(ManualBitVector, length)
 end
 
 function get_address(pv::ManualBitVector, i::Int)
