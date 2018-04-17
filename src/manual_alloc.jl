@@ -30,6 +30,15 @@ function init(ptr::Ptr{Void}, man::Manual{T}) where T
     ptr
 end
 
+alloc_size(::Type{Manual{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
+
+function init(ptr::Ptr{Void}, man::Manual{Manual{T}}, args...) where T
+    @v man.ptr = ptr
+    t = Manual{T}(ptr)
+    t_ptr = ptr + sizeof(T)
+    init(t, t_ptr, args...)
+end
+
 alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
 function init(ptr::Ptr{Void}, pv::Manual{ManualVector{T}}, length::Int64) where T
@@ -60,15 +69,6 @@ function init(ptr::Ptr{Void}, ps::Manual{ManualString}, string::Union{String, Ma
     ptr = init(ptr, ps, string.len)
     unsafe_copy!((@v ps), string)
     ptr
-end
-
-alloc_size(::Type{Manual{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
-
-function init(ptr::Ptr{Void}, man::Manual{Manual{T}}, args...) where T
-    @v man.ptr = ptr
-    t = Manual{T}(ptr)
-    t_ptr = ptr + sizeof(T)
-    init(t, t_ptr, args...)
 end
 
 """
