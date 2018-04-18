@@ -36,7 +36,7 @@ function init(ptr::Ptr{Void}, man::Manual{Manual{T}}, args...) where T
     @v man.ptr = ptr
     t = Manual{T}(ptr)
     t_ptr = ptr + sizeof(T)
-    init(t, t_ptr, args...)
+    init(t_ptr, t, args...)
 end
 
 alloc_size(::Type{ManualVector{T}}, length::Int64) where {T} = sizeof(T) * length
