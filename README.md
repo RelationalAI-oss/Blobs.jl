@@ -8,18 +8,18 @@ Blobs makes it easy to lay out complex data-structures within a single memory re
 
 This makes them ideal for implementing out-of-core data-structures or for DMA to co-processors.
 
-WARNING: This library is currently not memory-safe. Improper usage can cause segfaults or memory corruption. Upcoming versions will fix this.
+## Safety
+
+This library does not protect against:
+
+* giving an incorrect length when creating a `Blob`
+* using a `Blob` after freeing the underlying allocation
+
+Apart from that, all other operations are safe. User error or invalid data can cause `AssertionError` but cannot segfault the program or modify memory outside the blob.
 
 ## Usage
 
 Acquire a `Ptr{Void}` from somewhere:
-
-``` julia
-julia> p = Libc.malloc(20)
-Ptr{Void} @0x0000000002a2c070
-```
-
-We can interpret this pointer as any `isbits` Julia struct:
 
 ``` julia
 julia> struct Foo
@@ -27,99 +27,65 @@ julia> struct Foo
        y::Bool
        end
 
-julia> m = Blob{Foo}(p)
-Blobs.Blob{Foo}(Ptr{Void} @0x0000000002a2c070)
+julia> p = Libc.malloc(sizeof(Foo))
+Ptr{Void} @0x0000000006416020
 ```
 
-Use the `@a` (for address) macro to obtain pointers to the fields of this struct:
+We can interpret this pointer as any `isbits` Julia struct:
 
 ``` julia
-julia> @a m.x
-Blobs.Blob{Int64}(Ptr{Void} @0x0000000002a2c070)
-
-julia> @a m.y
-Blobs.Blob{Bool}(Ptr{Void} @0x0000000002a2c078)
+julia> foo = Blob{Foo}(p, UInt64(0), UInt64(sizeof(Foo)))
+Blobs.Blob{Foo}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
 ```
 
-Or the `@v` (for value) macro to dereference those pointers:
+(See `Blobs.malloc_and_init` for a safer way to create a fresh blob).
+
+Use the `@blob` macro to obtain references to the fields of this struct:
 
 ``` julia
-julia> @v m.x
-44307392
+julia> @blob foo.x
+Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
 
-julia> @v m.y
+julia> @blob foo.y
+Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000008, 0x0000000000000010)
+```
+
+Or to dereference those references:
+
+``` julia
+julia> @blob foo.x[]
+114974496
+
+julia> @blob foo.y[]
 true
 
-julia> y = @a m.y
-Blobs.Blob{Bool}(Ptr{Void} @0x0000000002a2c078)
+julia> y = @blob foo.y
+Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000008, 0x0000000000000010)
 
-julia> @v y
+julia> @blob y[]
 true
 ```
 
-The `@v` macro also allows setting the value of a pointer:
+The `@blob` macro also allows setting the value of a reference:
 
 ``` julia
-julia> @v m.y = false
+julia> @blob foo.y[] = false
 false
 
-julia> @v m.y
+julia> @blob foo.y[]
 false
 
-julia> x = @a m.x
-Blobs.Blob{Int64}(Ptr{Void} @0x0000000002a2c070)
+julia> x = @blob foo.x
+Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
 
-julia> @v x = 42
-Ptr{Int64} @0x0000000002a2c070
-
-julia> @v x
+julia> @blob x[] = 42
 42
 
-julia> @v m.x
+julia> @blob x[]
+42
+
+julia> @blob foo.x[]
 42
 ```
 
-The data-structures in this module can be nested arbitrarily:
-
-``` julia
-julia> struct PackedMemoryArray{K,V}
-            keys::BlobVector{K}
-            values::BlobVector{V}
-            mask::BlobBitVector
-            count::Int
-            #...other stuff
-       end
-
-julia> function Blob{PackedMemoryArray{K,V}}(length::Int64) where {K,V}
-           size = sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V) + Int64(ceil(length/8))
-           ptr = Libc.malloc(size)
-           pma = Blob{PackedMemoryArray{K,V}}(ptr)
-           @v pma.keys = BlobVector{K}(ptr + sizeof(PackedMemoryArray{K,V}), length)
-           @v pma.values = BlobVector{V}(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K), length)
-           @v pma.mask = BlobBitVector(ptr + sizeof(PackedMemoryArray{K,V}) + length*sizeof(K) + length*sizeof(V), length)
-           fill!((@v pma.mask), false)
-           @v pma.count = 0
-           pma
-       end
-
-julia> pma = Blob{PackedMemoryArray{Int64, Float32}}(3)
-Blobs.Blob{PackedMemoryArray{Int64,Float32}}(Ptr{Void} @0x00000000033e4580)
-
-julia> @v pma.count
-0
-
-julia> @v pma.mask
-3-element Blobs.BlobBitVector:
- false
- false
- false
-
-julia> @v pma.mask[1] = true
-Ptr{UInt64} @0x00000000033e45dc
-
-julia> @v pma.mask
-3-element Blobs.BlobBitVector:
-  true
- false
- false
-```
+The various data-structures provided can be nested arbitrarily. See the [tests](https://github.com/RelationalAI-oss/Blobs.jl/) for examples.
