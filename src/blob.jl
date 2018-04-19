@@ -3,28 +3,41 @@ A pointer to a `T` stored inside a Blob.
 """
 # TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 struct Blob{T}
-    ptr::Ptr{Void}
+    base::Ptr{Void}
+    offset::UInt64
+    limit::UInt64
 
-    function Blob{T}(ptr::Ptr{Void}) where {T}
+    function Blob{T}(base::Ptr{Void}, offset::UInt64, limit::UInt64) where {T}
         @assert isbits(T)
-        new(ptr)
+        @assert offset + sizeof(T) <= limit "Out of bounds: Blob{$T}($base, $offset, $limit)"
+        new(base, offset, limit)
     end
 end
 
-function Base.pointer(blob::Blob)
-    convert(Ptr{UInt8}, blob.ptr)
+function assert_same_allocation(blob1::Blob, blob2::Blob)
+    @assert blob1.base == blob2.base "These blobs do not share the same allocation: $blob1 - $blob2"
+end
+
+function Base.pointer(blob::Blob{T}) where T
+    convert(Ptr{T}, blob.base + blob.offset)
 end
 
 function Base.convert(::Type{Blob{T}}, blob::Blob) where T
-    Blob{T}(blob.ptr)
+    Blob{T}(blob.base, blob.offset, blob.limit)
+end
+
+# avoid double boundscheck in the common case of Blob{T}(blob) + offset
+function Blob{T}(blob::Blob, offset::Integer) where T
+    Blob{T}(blob.base, blob.offset + offset, blob.limit)
 end
 
 function Base.:+(blob::Blob{T}, offset::Integer) where T
-    Blob{T}(blob.ptr + offset)
+    Blob{T}(blob.base, blob.offset + offset, blob.limit)
 end
 
 function Base.:-(blob1::Blob, blob2::Blob)
-    blob1.ptr - blob2.ptr
+    assert_same_allocation(blob1, blob2)
+    blob1.offset - blob2.offset
 end
 
 function rewrite_address(expr)
@@ -97,7 +110,7 @@ end
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob.ptr + $(fieldoffset(T, i)))
+        Blob{$(fieldtype(T, i))}(blob, $(fieldoffset(T, i)))
     end
 end
 
@@ -106,7 +119,7 @@ end
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_load(convert(Ptr{T}, blob.ptr))
+            unsafe_load(pointer(blob))
         end
     else
         # is a composite type - recursively load its fields so that specializations of this method can hook in and alter loading
@@ -122,7 +135,7 @@ end
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_store!(convert(Ptr{T}, blob.ptr), value)
+            unsafe_store!(pointer(blob), value)
             value
         end
     else
@@ -142,12 +155,13 @@ end
     unsafe_store!(blob, convert(T, value))
 end
 
-# pointers to other parts of the region need to be converted into offsets
+# patch pointers on the fly during load/store
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
-    offset = unsafe_load(Blob{UInt64}(blob.ptr))
-    Blob{T}(blob.ptr + offset)
+    unpatched_blob = unsafe_load(pointer(blob))
+    Blob{T}(blob.base, blob.offset + unpatched_blob.offset, blob.limit)
 end
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
-    offset = value.ptr - blob.ptr
-    unsafe_store!(Blob{UInt64}(blob.ptr), offset)
+    assert_same_allocation(blob, value)
+    unpatched_blob = Blob{T}(blob.base, value.offset - blob.offset, blob.limit)
+    unsafe_store!(pointer(blob), unpatched_blob)
 end

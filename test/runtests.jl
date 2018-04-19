@@ -11,7 +11,7 @@ end
 
 # Blob
 
-foo = Blobs.malloc_and_init(Blob{Foo}) # display should work in 0.7 TODO fix for 0.6?
+foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @v foo.x = 1
 @test @v(foo.x) == 1
 @v foo.y = 2.5
@@ -19,11 +19,18 @@ foo = Blobs.malloc_and_init(Blob{Foo}) # display should work in 0.7 TODO fix for
 @test (@v foo) == Foo(1,2.5)
 # test interior pointers
 @test (@a foo) == foo
-@test (@a foo.y).ptr == foo.ptr + sizeof(Int64)
+@test pointer(@a foo.y) == pointer(foo) + sizeof(Int64)
 
 # test ambiguous syntax
 @test_throws ErrorException eval(:(@v foo.y == 2.5))
 @test_throws ErrorException eval(:(@a foo.y == 2.5))
+
+# nested Blob
+
+bfoo = Blobs.malloc_and_init(Blob{Foo})
+foo = @v bfoo
+@v foo.x = 1
+@test @v(foo.x) == 1
 
 # BlobVector
 
@@ -38,7 +45,7 @@ bv[3] = Foo(3, 3.3)
 # test iteration
 @test collect(bv) == [Foo(1,1.1), Foo(2,2.2), Foo(3,3.3)]
 # test interior pointers
-@test (@a bv[2]).ptr == bv.data.ptr + sizeof(Foo)
+@test pointer(@a bv[2]) == pointer(bv.data) + sizeof(Foo)
 
 # BlobBitVector
 
@@ -125,7 +132,7 @@ pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
 # tests fill!
 @test !any(@v pma.mask)
 # tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{UInt64}, pma.ptr), 1) == sizeof(PackedMemoryArray{Int64, Float32})
+@test unsafe_load(convert(Ptr{UInt64}, pointer(pma) + sizeof(UInt64)), 1) == sizeof(PackedMemoryArray{Int64, Float32})
 # tests nested interior pointers
 pma2 = @a pma.mask[2]
 @test (@v pma2) == false

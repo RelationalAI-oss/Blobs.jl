@@ -15,7 +15,7 @@ Initialize `blob`.
 Assumes that `blob` it at least `sizeof(T) + alloc_size(T, args...)` bytes long.
 """
 function init(blob::Blob{T}, args...) where T
-    init(blob, Blob{Void}(blob + sizeof(T)), args...)
+    init(blob, Blob{Void}(blob, sizeof(T)), args...)
 end
 
 """
@@ -47,7 +47,7 @@ function init(blob::Blob{BlobVector{T}}, free::Blob{Void}, length::Int64) where 
     free + alloc_size(BlobVector{T}, length)
 end
 
-alloc_size(::Type{BlobBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
+alloc_size(::Type{BlobBitVector}, length::Int64) = sizeof(UInt64) * UInt64(ceil(length / sizeof(UInt64)))
 
 function init(blob::Blob{BlobBitVector}, free::Blob{Void}, length::Int64)
     @v blob.data = Blob{UInt64}(free)
@@ -78,7 +78,7 @@ Allocate an uninitialized `Blob{T}`.
 """
 function malloc(::Type{T}, args...)::Blob{T} where T
     size = sizeof(T) + alloc_size(T, args...)
-    Blob{T}(Libc.malloc(size))
+    Blob{T}(Libc.malloc(size), UInt64(0), UInt64(size))
 end
 
 """
@@ -88,7 +88,7 @@ Allocate and initialize a new `Blob{T}`.
 """
 function malloc_and_init(::Type{T}, args...)::Blob{T} where T
     size = sizeof(T) + alloc_size(T, args...)
-    blob = Blob{T}(Libc.malloc(size))
+    blob = Blob{T}(Libc.malloc(size), UInt64(0), UInt64(size))
     used = init(blob, args...)
     @assert used - blob == size
     blob
@@ -100,5 +100,5 @@ end
 Free the underlying allocation for `blob`.
 """
 function free(blob::Blob)
-    Libc.free(blob.ptr)
+    Libc.free(blob.base)
 end
