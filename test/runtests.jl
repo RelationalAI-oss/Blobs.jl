@@ -130,36 +130,52 @@ pma2 = @a pma.mask[2]
 
 # test api works ok with varying sizes
 
+struct Quux
+    x::ManualVector{Int}
+    y::Float64
+end
+
 struct Bar
     a::Int
     b::ManualBitVector
     c::Bool
     d::ManualVector{Float64}
-    e::Manual{Int64}
+    e::Manual{Quux}
 end
 
-function MM.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64)
+function MM.alloc_size(::Type{Quux}, x_len::Int64, y::Float64)
+    T = Quux
+    +(MM.alloc_size(fieldtype(T, :x), x_len))
+end
+
+function MM.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
     T = Bar
     +(MM.alloc_size(fieldtype(T, :b), b_len),
       MM.alloc_size(fieldtype(T, :d), d_len),
-      MM.alloc_size(fieldtype(T, :e)))
-  end
+      MM.alloc_size(fieldtype(T, :e), x_len, y))
+end
 
-function MM.init(ptr::Ptr{Void}, bar::Manual{Bar}, b_len::Int64, c::Bool, d_len::Int64)
+function MM.init(ptr::Ptr{Void}, quux::Manual{Quux}, x_len::Int64, y::Float64)
+    ptr = MM.init(ptr, (@a quux.x), x_len)
+    @v quux.y = y
+    ptr
+end
+
+function MM.init(ptr::Ptr{Void}, bar::Manual{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
     ptr = MM.init(ptr, (@a bar.b), b_len)
     ptr = MM.init(ptr, (@a bar.d), d_len)
-    ptr = MM.init(ptr, (@a bar.e))
+    ptr = MM.init(ptr, (@a bar.e), x_len, y)
     @v bar.c = c
     ptr
 end
 
-bar = MM.malloc(Bar, 10, false, 20)
-e = @v bar.e
-@v e = 3
+bar = MM.malloc(Bar, 10, false, 20, 15, 1.5)
+quux = @v bar.e
 
-@test (@v bar.c) == false
 @test length(@v bar.b) == 10
+@test (@v bar.c) == false
 @test length(@v bar.d) == 20
-@test (@v e) == 3
+@test length(@v quux.x) == 15
+@test (@v quux.y) == 1.5
 
 end
