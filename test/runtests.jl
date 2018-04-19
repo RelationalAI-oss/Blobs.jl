@@ -135,25 +135,31 @@ struct Bar
     b::ManualBitVector
     c::Bool
     d::ManualVector{Float64}
+    e::Manual{Int64}
 end
 
 function MM.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64)
     T = Bar
     +(MM.alloc_size(fieldtype(T, :b), b_len),
-      MM.alloc_size(fieldtype(T, :d), d_len))
+      MM.alloc_size(fieldtype(T, :d), d_len),
+      MM.alloc_size(fieldtype(T, :e)))
   end
 
 function MM.init(ptr::Ptr{Void}, bar::Manual{Bar}, b_len::Int64, c::Bool, d_len::Int64)
     ptr = MM.init(ptr, (@a bar.b), b_len)
     ptr = MM.init(ptr, (@a bar.d), d_len)
+    ptr = MM.init(ptr, (@a bar.e))
     @v bar.c = c
     ptr
 end
 
 bar = MM.malloc(Bar, 10, false, 20)
+e = @v bar.e
+@v e = 3
 
 @test (@v bar.c) == false
 @test length(@v bar.b) == 10
 @test length(@v bar.d) == 20
+@test (@v e) == 3
 
 end

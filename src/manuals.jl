@@ -76,10 +76,6 @@ macro v(expr)
     rewrite_value(expr)
 end
 
-function get_address(man::Manual{Manual{T}}, ::Type{Val{field}}) where {T, field}
-    get_address(Manual{T}(man.ptr), Val{field})
-end
-
 @generated function get_address(man::Manual{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
