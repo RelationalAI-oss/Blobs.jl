@@ -5,7 +5,9 @@ struct BlobVector{T} <: AbstractArray{T, 1}
 
     function BlobVector{T}(data::Blob{T}, length::Int64) where {T}
         @assert isbits(T)
-        new(data, length)
+        blob = new(data, length)
+        get_address(blob, length) # bounds check
+        blob
     end
 end
 

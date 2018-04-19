@@ -2,6 +2,12 @@
 struct BlobBitVector <: AbstractArray{Bool, 1}
     data::Blob{UInt64}
     length::Int64
+
+    function BlobBitVector(data::Blob{UInt64}, length::Int64)
+        blob = new(data, length)
+        get_address(blob, length) # bounds check
+        blob
+    end
 end
 
 struct BlobBit

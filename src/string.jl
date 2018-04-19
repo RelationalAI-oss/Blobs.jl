@@ -2,6 +2,12 @@
 struct BlobString <: AbstractString
     data::Blob{UInt8}
     len::Int64 # in bytes
+
+    function BlobString(data::Blob{UInt8}, len::Int64)
+        blob = new(data, len)
+        data + (len-1) # bounds check
+        blob
+    end
 end
 
 function Base.pointer(blob::BlobString)

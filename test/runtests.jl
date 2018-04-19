@@ -11,6 +11,9 @@ end
 
 # Blob
 
+Blob{Int64}(Libc.malloc(8), UInt64(0), UInt64(8))
+@test_throws AssertionError Blob{Int64}(Libc.malloc(8), UInt64(1), UInt64(8))
+
 foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @v foo.x = 1
 @test @v(foo.x) == 1
@@ -33,6 +36,10 @@ foo = @v bfoo
 @test @v(foo.x) == 1
 
 # BlobVector
+
+data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 3), UInt64(0), UInt64(sizeof(Int64) * 3))
+BlobVector{Int64}(data, 3)
+@test_throws AssertionError BlobVector{Int64}(data, 4)
 
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = @v bbv
