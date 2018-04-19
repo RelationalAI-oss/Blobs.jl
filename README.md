@@ -72,6 +72,12 @@ true
 The `@blob` macro also allows setting the value of a reference:
 
 ``` julia
+julia> @blob foo[] = Foo(12, true)
+Foo(12, true)
+
+julia> @blob foo[]
+Foo(12, true)
+
 julia> @blob foo.y[] = false
 false
 
