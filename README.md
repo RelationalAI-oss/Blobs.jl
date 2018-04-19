@@ -53,6 +53,9 @@ Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000008, 0x0000000000
 Or to dereference those references:
 
 ``` julia
+julia> @blob foo[]
+Foo(114974496, true)
+
 julia> @blob foo.x[]
 114974496
 
