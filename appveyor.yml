@@ -41,7 +41,7 @@ build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
   - C:\projects\julia\bin\julia -e "versioninfo();
-      Pkg.clone(pwd(), \"ManualMemory\"); Pkg.build(\"ManualMemory\")"
+      Pkg.clone(pwd(), \"Blobs\"); Pkg.build(\"Blobs\")"
 
 test_script:
-  - C:\projects\julia\bin\julia -e "Pkg.test(\"ManualMemory\")"
+  - C:\projects\julia\bin\julia -e "Pkg.test(\"Blobs\")"

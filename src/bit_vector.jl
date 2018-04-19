@@ -1,39 +1,39 @@
 "A fixed-length bit vector whose data is stored in some manually managed region of memory."
-struct ManualBitVector <: AbstractArray{Bool, 1}
-    ptr::Manual{UInt64}
+struct BlobBitVector <: AbstractArray{Bool, 1}
+    ptr::Blob{UInt64}
     length::Int64
 end
 
-struct ManualBit
-    ptr::Manual{UInt64}
+struct BlobBit
+    ptr::Blob{UInt64}
     mask::UInt64
 end
 
-function get_address(pv::ManualBitVector, i::Int)
+function get_address(pv::BlobBitVector, i::Int)
     (i < 1 || i > pv.length) && throw(BoundsError(pv, i))
     i1, i2 = Base.get_chunks_id(i)
-    ManualBit(Manual{UInt64}(pv.ptr.ptr + (i1-1)*sizeof(UInt64)), UInt64(1) << i2)
+    BlobBit(Blob{UInt64}(pv.ptr.ptr + (i1-1)*sizeof(UInt64)), UInt64(1) << i2)
 end
 
-function get_address(pv::Manual{ManualBitVector}, i::Int)
+function get_address(pv::Blob{BlobBitVector}, i::Int)
     get_address(unsafe_load(pv), i)
 end
 
-function Base.unsafe_load(pb::ManualBit)
+function Base.unsafe_load(pb::BlobBit)
     (unsafe_load(pb.ptr) & pb.mask) != 0
 end
 
-function Base.unsafe_store!(pb::ManualBit, v::Bool)
+function Base.unsafe_store!(pb::BlobBit, v::Bool)
     c = unsafe_load(pb.ptr)
     c = ifelse(v, c | pb.mask, c & ~pb.mask)
     unsafe_store!(pb.ptr, c)
 end
 
-function unsafe_resize!(pb::ManualBitVector, length::Int64)
+function unsafe_resize!(pb::BlobBitVector, length::Int64)
     @v pb.length = length
 end
 
-function Base.findprevnot(pb::ManualBitVector, start::Int)
+function Base.findprevnot(pb::BlobBitVector, start::Int)
     start > 0 || return 0
     start > length(pb) && throw(BoundsError(pb, start))
 
@@ -65,7 +65,7 @@ function Base.findprevnot(pb::ManualBitVector, start::Int)
     # return 0
 end
 
-function Base.findnextnot(pb::ManualBitVector, start::Int)
+function Base.findnextnot(pb::BlobBitVector, start::Int)
     start > 0 || throw(BoundsError(pb, start))
     start > length(pb) && return 0
 
@@ -81,18 +81,18 @@ end
 
 # array interface
 
-function Base.size(pv::ManualBitVector)
+function Base.size(pv::BlobBitVector)
     (pv.length,)
 end
 
-function Base.getindex(pv::ManualBitVector, i::Int)
+function Base.getindex(pv::BlobBitVector, i::Int)
     unsafe_load(get_address(pv, i))
 end
 
-function Base.setindex!(pv::ManualBitVector, v::Bool, i::Int)
+function Base.setindex!(pv::BlobBitVector, v::Bool, i::Int)
     unsafe_store!(get_address(pv, i), v)
 end
 
-function Base.IndexStyle(_::Type{ManualBitVector})
+function Base.IndexStyle(_::Type{BlobBitVector})
     Base.IndexLinear()
 end

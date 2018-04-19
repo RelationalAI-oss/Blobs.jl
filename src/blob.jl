@@ -2,10 +2,10 @@
 A pointer to a `T` in some manually managed region of memory.
 """
 # TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
-struct Manual{T}
+struct Blob{T}
     ptr::Ptr{Void}
 
-    function Manual{T}(ptr::Ptr{Void}) where {T}
+    function Blob{T}(ptr::Ptr{Void}) where {T}
         @assert isbits(T)
         new(ptr)
     end
@@ -35,9 +35,9 @@ function rewrite_address(expr)
 end
 
 """
-    @a man.x[2].y
+    @a blob.x[2].y
 
-Get a `Manual` pointing at the *address* of `man.x[2].y`.
+Get a `Blob` pointing at the *address* of `blob.x[2].y`.
 """
 macro a(expr)
     rewrite_address(expr)
@@ -56,58 +56,58 @@ function rewrite_value(expr)
 end
 
 """
-    @v man.x[2].y
+    @v blob.x[2].y
 
-Get the *value* at `man.x[2].y`.
+Get the *value* at `blob.x[2].y`.
 
-    @v man.x[2].y = 42
+    @v blob.x[2].y = 42
 
-Set the *value* at `man.x[2].y`.
+Set the *value* at `blob.x[2].y`.
 
 NOTE macros bind tightly, so:
 
     # invalid syntax
-    @v man.x[2].y < 42
+    @v blob.x[2].y < 42
 
     # valid syntax
-    (@v man.x[2].y) < 42
+    (@v blob.x[2].y) < 42
 """
 macro v(expr)
     rewrite_value(expr)
 end
 
-@generated function get_address(man::Manual{T}, ::Type{Val{field}}) where {T, field}
+@generated function get_address(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Manual{$(fieldtype(T, i))}(man.ptr + $(fieldoffset(T, i)))
+        Blob{$(fieldtype(T, i))}(blob.ptr + $(fieldoffset(T, i)))
     end
 end
 
-@generated function Base.unsafe_load(man::Manual{T}) where {T}
+@generated function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_load(convert(Ptr{T}, man.ptr))
+            unsafe_load(convert(Ptr{T}, blob.ptr))
         end
     else
         # is a composite type - recursively load its fields
         # so that specializations of this method can hook in and alter loading
         $(Expr(:meta, :inline))
         Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-            unsafe_load(get_address(man, $(Val{field})))
+            unsafe_load(get_address(blob, $(Val{field})))
         end)
     end
 end
 
-@generated function Base.unsafe_store!(man::Manual{T}, value::T) where {T}
+@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
         # is a primitive type
         quote
             $(Expr(:meta, :inline))
-            unsafe_store!(convert(Ptr{T}, man.ptr), value)
+            unsafe_store!(convert(Ptr{T}, blob.ptr), value)
             value
         end
     else
@@ -116,7 +116,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(get_address(man, $(Val{field})), value.$field)
+                unsafe_store!(get_address(blob, $(Val{field})), value.$field)
             end)
             value
         end
@@ -124,18 +124,18 @@ end
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-@inline function Base.unsafe_store!(man::Manual{T}, value) where {T}
-    unsafe_store!(man, convert(T, value))
+@inline function Base.unsafe_store!(blob::Blob{T}, value) where {T}
+    unsafe_store!(blob, convert(T, value))
 end
 
 # pointers to other parts of the region need to be converted into offsets
 
-@inline function Base.unsafe_load(man::Manual{Manual{T}}) where {T}
-    offset = unsafe_load(Manual{UInt64}(man.ptr))
-    Manual{T}(man.ptr + offset)
+@inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
+    offset = unsafe_load(Blob{UInt64}(blob.ptr))
+    Blob{T}(blob.ptr + offset)
 end
 
-@inline function Base.unsafe_store!(man::Manual{Manual{T}}, value::Manual{T}) where {T}
-    offset = value.ptr - man.ptr
-    unsafe_store!(Manual{UInt64}(man.ptr), offset)
+@inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
+    offset = value.ptr - blob.ptr
+    unsafe_store!(Blob{UInt64}(blob.ptr), offset)
 end
