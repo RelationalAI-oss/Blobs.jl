@@ -11,7 +11,7 @@ end
 
 # Blob
 
-foo = Blob{Foo}(Libc.malloc(sizeof(Foo))) # display should work in 0.7 TODO fix for 0.6?
+foo = Blobs.malloc_and_init(Blob{Foo}) # display should work in 0.7 TODO fix for 0.6?
 @v foo.x = 1
 @test @v(foo.x) == 1
 @v foo.y = 2.5
@@ -27,7 +27,7 @@ foo = Blob{Foo}(Libc.malloc(sizeof(Foo))) # display should work in 0.7 TODO fix 
 
 # BlobVector
 
-bbv = Blobs.malloc(BlobVector{Foo}, 3)
+bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = @v bbv
 bv[2] = Foo(2, 2.2)
 @test bv[2] == Foo(2, 2.2)
@@ -42,7 +42,7 @@ bv[3] = Foo(3, 3.3)
 
 # BlobBitVector
 
-bbv = Blobs.malloc(BlobBitVector, 3)
+bbv = Blobs.malloc_and_init(BlobBitVector, 3)
 bv = @v bbv
 bv[2] = true
 @test bv[2] == true
@@ -65,7 +65,7 @@ bv2 = @a bv[2]
 
 # test strings and unicode
 s = "普通话/普通話"
-bbs = Blobs.malloc(BlobString, s)
+bbs = Blobs.malloc_and_init(BlobString, s)
 bs = @v bbs
 @test bs == s
 @test repr(bs) == repr(s)
@@ -76,7 +76,7 @@ bs = @v bbs
 
 # test right-to-left
 s = "سلام"
-bbs = Blobs.malloc(BlobString, s)
+bbs = Blobs.malloc_and_init(BlobString, s)
 bs = @v bbs
 @test bs == s
 @test repr(bs) == repr(s)
@@ -119,7 +119,7 @@ function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Void}, length:
     free
 end
 
-pma = Blobs.malloc(PackedMemoryArray{Int64, Float32}, 3)
+pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
 @test (@v pma.count) == 0
 @test (@v pma.keys.length) == 3
 # tests fill!
@@ -174,7 +174,7 @@ function Blobs.init(bar::Blob{Bar}, free::Blob{Void}, b_len::Int64, c::Bool, d_l
     free
 end
 
-bar = Blobs.malloc(Bar, 10, false, 20, 15, 1.5)
+bar = Blobs.malloc_and_init(Bar, 10, false, 20, 15, 1.5)
 quux = @v bar.e
 
 @test length(@v bar.b) == 10

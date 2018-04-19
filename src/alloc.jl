@@ -28,7 +28,7 @@ The default implementation where `alloc_size(T) == 0` does nothing. Override thi
 function init(blob::Blob{T}, free::Blob{Void}) where T
     @assert alloc_size(T) == 0 "Default init cannot be used for types for which alloc_size(T) != 0"
     # TODO should we zero memory?
-    ptr
+    free
 end
 
 alloc_size(::Type{Blob{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
@@ -74,14 +74,31 @@ end
 """
     malloc(::Type{T}, args...)::Blob{T} where T
 
-Allocate and initialize a new `Blob{T}`.
+Allocate an uninitialized `Blob{T}`.
 """
 function malloc(::Type{T}, args...)::Blob{T} where T
     size = sizeof(T) + alloc_size(T, args...)
-    ptr = Libc.malloc(size)
-    blob = Blob{T}(ptr)
-    free = Blob{Void}(ptr + sizeof(T))
-    used = init(blob, free, args...)
+    Blob{T}(Libc.malloc(size))
+end
+
+"""
+    malloc_and_init(::Type{T}, args...)::Blob{T} where T
+
+Allocate and initialize a new `Blob{T}`.
+"""
+function malloc_and_init(::Type{T}, args...)::Blob{T} where T
+    size = sizeof(T) + alloc_size(T, args...)
+    blob = Blob{T}(Libc.malloc(size))
+    used = init(blob, args...)
     @assert used - blob == size
     blob
+end
+
+"""
+    free(blob::Blob)
+
+Free the underlying allocation for `blob`.
+"""
+function free(blob::Blob)
+    Libc.free(blob.ptr)
 end
