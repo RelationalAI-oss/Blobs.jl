@@ -8,23 +8,13 @@ Defaults to 0.
 alloc_size(::Type{T}) where T = 0
 
 """
-    init(blob::Blob{T}, args...) where T
+    init(free::Ptr{Void}, blob::Blob{T}, args...)::Ptr{Void} where T
 
-Initialize `blob`.
-"""
-function init(blob::Blob{T}, args...) where T
-    init(blob.ptr + sizeof(T), blob, args...)
-    nothing
-end
-
-"""
-    init(ptr::Ptr{Void}, blob::Blob{T}, args...)::Ptr{Void} where T
-
-Initialize `blob`, where `ptr` is the beginning of the remaining free space. Must return `ptr + alloc_size(T, args...)`. Override this method to add custom initializers for your types.
+Initialize `blob`, where `free` is the beginning of the remaining free space. Must return `free + alloc_size(T, args...)`. Override this method to add custom initializers for your types.
 
 The default implementation where `alloc_size(T) == 0` does nothing.
 """
-function init(ptr::Ptr{Void}, blob::Blob{T}) where T
+function init(free::Blob{Void}, blob::Blob{T}) where T
     @assert alloc_size(T) == 0 "Default init cannot be used for types for which alloc_size(T) != 0"
     # TODO should we zero memory?
     ptr
@@ -32,43 +22,42 @@ end
 
 alloc_size(::Type{Blob{T}}, args...) where T = sizeof(T) + alloc_size(T, args...)
 
-function init(ptr::Ptr{Void}, blob::Blob{Blob{T}}, args...) where T
-    @v blob = Blob{T}(ptr)
-    t = Blob{T}(ptr)
-    t_ptr = ptr + sizeof(T)
-    init(t_ptr, t, args...)
+function init(free::Blob{Void}, blob::Blob{Blob{T}}, args...) where T
+    nested_blob = Blob{T}(free)
+    @v blob = nested_blob
+    init(free + sizeof(T), nested_blob, args...)
 end
 
 alloc_size(::Type{BlobVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
-function init(ptr::Ptr{Void}, blob::Blob{BlobVector{T}}, length::Int64) where T
-    @v blob.data = Blob{T}(ptr)
+function init(free::Blob{Void}, blob::Blob{BlobVector{T}}, length::Int64) where T
+    @v blob.data = Blob{T}(free)
     @v blob.length = length
-    ptr + alloc_size(BlobVector{T}, length)
+    free + alloc_size(BlobVector{T}, length)
 end
 
 alloc_size(::Type{BlobBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
 
-function init(ptr::Ptr{Void}, blob::Blob{BlobBitVector}, length::Int64)
-    @v blob.data = Blob{UInt64}(ptr)
+function init(free::Blob{Void}, blob::Blob{BlobBitVector}, length::Int64)
+    @v blob.data = Blob{UInt64}(free)
     @v blob.length = length
-    ptr + alloc_size(BlobBitVector, length)
+    free + alloc_size(BlobBitVector, length)
 end
 
 alloc_size(::Type{BlobString}, length::Int64) = length
 
-function init(ptr::Ptr{Void}, blob::Blob{BlobString}, length::Int64)
-    @v blob.data = Blob{UInt8}(ptr)
+function init(free::Blob{Void}, blob::Blob{BlobString}, length::Int64)
+    @v blob.data = Blob{UInt8}(free)
     @v blob.len = length
-    ptr + alloc_size(BlobString, length)
+    free + alloc_size(BlobString, length)
 end
 
 alloc_size(::Type{BlobString}, string::Union{String, BlobString}) = string.len
 
-function init(ptr::Ptr{Void}, blob::Blob{BlobString}, string::Union{String, BlobString})
-    ptr = init(ptr, blob, string.len)
+function init(free::Blob{Void}, blob::Blob{BlobString}, string::Union{String, BlobString})
+    free = init(free, blob, string.len)
     unsafe_copy!((@v blob), string)
-    ptr
+    free
 end
 
 """
@@ -80,7 +69,8 @@ function malloc(::Type{T}, args...)::Blob{T} where T
     size = sizeof(T) + alloc_size(T, args...)
     ptr = Libc.malloc(size)
     blob = Blob{T}(ptr)
-    end_ptr = init(ptr + sizeof(T), blob, args...)
-    @assert end_ptr - ptr == size
+    free = Blob{Void}(ptr + sizeof(T))
+    used = init(free, blob, args...)
+    @assert used - blob == size
     blob
 end

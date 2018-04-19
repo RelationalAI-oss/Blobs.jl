@@ -23,6 +23,10 @@ function Base.:+(blob::Blob{T}, offset::Integer) where T
     Blob{T}(blob.ptr + offset)
 end
 
+function Base.:-(blob1::Blob, blob2::Blob)
+    blob1.ptr - blob2.ptr
+end
+
 function rewrite_address(expr)
     if !(expr isa Expr)
         esc(expr)

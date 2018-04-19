@@ -110,13 +110,13 @@ function Blobs.alloc_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {
       Blobs.alloc_size(fieldtype(T, :mask), length))
   end
 
-function Blobs.init(ptr::Ptr{Void}, pma::Blob{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
-    ptr = Blobs.init(ptr, (@a pma.keys), length)
-    ptr = Blobs.init(ptr, (@a pma.values), length)
-    ptr = Blobs.init(ptr, (@a pma.mask), length)
+function Blobs.init(free::Blob{Void}, pma::Blob{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
+    free = Blobs.init(free, (@a pma.keys), length)
+    free = Blobs.init(free, (@a pma.values), length)
+    free = Blobs.init(free, (@a pma.mask), length)
     fill!((@v pma.mask), false)
     @v pma.count = 0
-    ptr
+    free
 end
 
 pma = Blobs.malloc(PackedMemoryArray{Int64, Float32}, 3)
@@ -160,18 +160,18 @@ function Blobs.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_le
       Blobs.alloc_size(fieldtype(T, :e), x_len, y))
 end
 
-function Blobs.init(ptr::Ptr{Void}, quux::Blob{Quux}, x_len::Int64, y::Float64)
-    ptr = Blobs.init(ptr, (@a quux.x), x_len)
+function Blobs.init(free::Blob{Void}, quux::Blob{Quux}, x_len::Int64, y::Float64)
+    free = Blobs.init(free, (@a quux.x), x_len)
     @v quux.y = y
-    ptr
+    free
 end
 
-function Blobs.init(ptr::Ptr{Void}, bar::Blob{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
-    ptr = Blobs.init(ptr, (@a bar.b), b_len)
-    ptr = Blobs.init(ptr, (@a bar.d), d_len)
-    ptr = Blobs.init(ptr, (@a bar.e), x_len, y)
+function Blobs.init(free::Blob{Void}, bar::Blob{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+    free = Blobs.init(free, (@a bar.b), b_len)
+    free = Blobs.init(free, (@a bar.d), d_len)
+    free = Blobs.init(free, (@a bar.e), x_len, y)
     @v bar.c = c
-    ptr
+    free
 end
 
 bar = Blobs.malloc(Bar, 10, false, 20, 15, 1.5)
