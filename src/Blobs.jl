@@ -1,5 +1,7 @@
 module Blobs
 
+using MacroTools
+
 macro splice(iterator, body)
   @assert iterator.head == :call
   @assert iterator.args[1] == :in
@@ -12,6 +14,6 @@ include("bit_vector.jl")
 include("string.jl")
 include("alloc.jl")
 
-export Blob, BlobVector, BlobBitVector, BlobString, @a, @v
+export Blob, BlobVector, BlobBitVector, BlobString, @blob
 
 end

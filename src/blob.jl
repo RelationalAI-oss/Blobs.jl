@@ -40,69 +40,57 @@ function Base.:-(blob1::Blob, blob2::Blob)
     blob1.offset - blob2.offset
 end
 
-function rewrite_address(expr)
-    if !(expr isa Expr)
-        esc(expr)
-    elseif expr.head == :.
-        (object, field) = expr.args
-        if field isa QuoteNode
-            fieldname = field.value
-        elseif field isa Expr && field.head == :quote
-            fieldname = field.args[1]
-        else
-            error("Impossible?")
-        end
-        :(get_address($(rewrite_address(object)), $(Val{fieldname})))
-    elseif expr.head == :ref
-        object = expr.args[1]
-        :(get_address($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
-    elseif expr.head == :macrocall
-        rewrite_address(macroexpand(expr))
+function rewrite_get(expr)
+    if @capture(expr, object_.field_)
+        :(get_address($(rewrite_get(object)), $(Val{field})))
+    elseif @capture(expr, object_[ixes__])
+        :(get_address($(rewrite_get(object)), $(map(esc, ixes)...)))
+    elseif @capture(expr, object_Symbol)
+        esc(object)
     else
         error("Don't know how to compute address for $expr")
     end
 end
 
-"""
-    @a blob.x[2].y
-
-Get a `Blob` pointing at the *address* of `blob.x[2].y`.
-"""
-macro a(expr)
-    rewrite_address(expr)
-end
-
-function rewrite_value(expr)
-    if (expr isa Expr) && (expr.head == :(=))
-        if length(expr.args) == 2
-            :(unsafe_store!($(rewrite_address(expr.args[1])), $(esc(expr.args[2]))))
-        else
-            error("Don't know how to compute assignment $expr")
-        end
+function rewrite_set(expr)
+    if @capture(expr, address_[] = value_)
+        :(unsafe_store!($(rewrite_get(address)), $(esc(value))))
     else
-        :(unsafe_load($(rewrite_address(expr))))
+        rewrite_get(expr)
     end
 end
 
 """
-    @v blob.x[2].y
+    @blob blob.x
 
-Get the *value* at `blob.x[2].y`.
+Get a `Blob` pointing at `blob.x`.
 
-    @v blob.x[2].y = 42
+    @blob blob.x[]
 
-Set the *value* at `blob.x[2].y`.
+Get the value of `blob.x`.
 
-NOTE macros bind tightly, so:
+    @blob blob.x[] = v
 
-    # invalid syntax
-    @v blob.x[2].y < 42
+Set the value of `blob.x`.
 
-    # valid syntax
-    (@v blob.x[2].y) < 42
+    @blob blob.vec[i]
+
+Get a `Blob` pointing at the i'th element of the Blob(Bit)Vector at `blob.vec`
+
+    @blob blob.vec[i][]
+
+Get the value of the i'th element of the Blob(Bit)Vector at `blob.vec`
+
+    @blob blob.vec[i][] = v
+
+Set the value of the i'th element of the Blob(Bit)Vector at `blob.vec`
 """
-macro v(expr)
-    rewrite_value(expr)
+macro blob(expr)
+    rewrite_set(expr)
+end
+
+function get_address(blob::Blob{T}) where T
+    unsafe_load(blob)
 end
 
 @generated function get_address(blob::Blob{T}, ::Type{Val{field}}) where {T, field}

@@ -25,6 +25,10 @@ function get_address(blob::Blob{BlobBitVector}, i::Int)
     get_address(unsafe_load(blob), i)
 end
 
+function get_address(blob::BlobBit)
+    unsafe_load(blob)
+end
+
 function Base.unsafe_load(blob::BlobBit)
     (unsafe_load(blob.data) & blob.mask) != 0
 end
@@ -36,7 +40,7 @@ function Base.unsafe_store!(blob::BlobBit, v::Bool)
 end
 
 function unsafe_resize!(blob::BlobBitVector, length::Int64)
-    @v blob.length = length
+    @blob blob.length[] = length
 end
 
 # array interface
