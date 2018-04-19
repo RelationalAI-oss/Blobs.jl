@@ -41,33 +41,33 @@ end
 
 alloc_size(::Type{BlobVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
-function init(ptr::Ptr{Void}, pv::Blob{BlobVector{T}}, length::Int64) where T
-    @v pv.ptr = Blob{T}(ptr)
-    @v pv.length = length
+function init(ptr::Ptr{Void}, blob::Blob{BlobVector{T}}, length::Int64) where T
+    @v blob.data = Blob{T}(ptr)
+    @v blob.length = length
     ptr + alloc_size(BlobVector{T}, length)
 end
 
 alloc_size(::Type{BlobBitVector}, length::Int64) = UInt64(ceil(length / sizeof(UInt64)))
 
-function init(ptr::Ptr{Void}, pv::Blob{BlobBitVector}, length::Int64)
-    @v pv.ptr = Blob{UInt64}(ptr)
-    @v pv.length = length
+function init(ptr::Ptr{Void}, blob::Blob{BlobBitVector}, length::Int64)
+    @v blob.data = Blob{UInt64}(ptr)
+    @v blob.length = length
     ptr + alloc_size(BlobBitVector, length)
 end
 
 alloc_size(::Type{BlobString}, length::Int64) = length
 
-function init(ptr::Ptr{Void}, ps::Blob{BlobString}, length::Int64)
-    @v ps.ptr = Blob{UInt8}(ptr)
-    @v ps.len = length
+function init(ptr::Ptr{Void}, blob::Blob{BlobString}, length::Int64)
+    @v blob.data = Blob{UInt8}(ptr)
+    @v blob.len = length
     ptr + alloc_size(BlobString, length)
 end
 
 alloc_size(::Type{BlobString}, string::Union{String, BlobString}) = string.len
 
-function init(ptr::Ptr{Void}, ps::Blob{BlobString}, string::Union{String, BlobString})
-    ptr = init(ptr, ps, string.len)
-    unsafe_copy!((@v ps), string)
+function init(ptr::Ptr{Void}, blob::Blob{BlobString}, string::Union{String, BlobString})
+    ptr = init(ptr, blob, string.len)
+    unsafe_copy!((@v blob), string)
     ptr
 end
 

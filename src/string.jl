@@ -1,23 +1,20 @@
+"A string whose data is stored in a Blob."
 struct BlobString <: AbstractString
-    ptr::Blob{UInt8}
+    data::Blob{UInt8}
     len::Int64 # in bytes
 end
 
-# creation
-
-function Base.unsafe_copy!(ps::BlobString, string::Union{BlobString, String})
-    @assert ps.len >= string.len
-    unsafe_copy!(convert(Ptr{UInt8}, ps.ptr.ptr), pointer(string), string.len)
+function Base.pointer(blob::BlobString)
+    pointer(blob.data)
 end
 
-function Base.String(ps::BlobString)
-    unsafe_string(convert(Ptr{UInt8}, ps.ptr.ptr), ps.len)
+function Base.unsafe_copy!(blob::BlobString, string::Union{BlobString, String})
+    @assert blob.len >= string.len
+    unsafe_copy!(pointer(blob), pointer(string), string.len)
 end
 
-# fields
-
-function Base.pointer(ps::BlobString)
-    convert(Ptr{UInt8}, ps.ptr.ptr)
+function Base.String(blob::BlobString)
+    unsafe_string(pointer(blob), blob.len)
 end
 
 # string interface - this is largely copied from Base and will almost certainly break when we move to 0.7

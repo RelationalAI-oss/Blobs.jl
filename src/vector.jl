@@ -1,35 +1,35 @@
-"A fixed-length vector whose data is stored in some manually managed region of memory."
+"A fixed-length vector whose data is stored in a Blob."
 struct BlobVector{T} <: AbstractArray{T, 1}
-    ptr::Blob{T}
+    data::Blob{T}
     length::Int64
 
-    function BlobVector{T}(ptr::Blob{T}, length::Int64) where {T}
+    function BlobVector{T}(data::Blob{T}, length::Int64) where {T}
         @assert isbits(T)
-        new(ptr, length)
+        new(data, length)
     end
 end
 
-@inline function get_address(pv::BlobVector{T}, i::Int) where {T}
-    (0 < i <= pv.length) || throw(BoundsError(pv, i))
-    Blob{T}(pv.ptr.ptr + (i-1)*sizeof(T))
+@inline function get_address(blob::BlobVector{T}, i::Int) where {T}
+    (0 < i <= blob.length) || throw(BoundsError(blob, i))
+    blob.data + (i-1)*sizeof(T)
 end
 
-function get_address(pv::Blob{BlobVector{T}}, i::Int) where {T}
-    get_address(unsafe_load(pv), i)
+function get_address(blob::Blob{BlobVector{T}}, i::Int) where {T}
+    get_address(unsafe_load(blob), i)
 end
 
 # array interface
 
-function Base.size(pv::BlobVector)
-    (pv.length,)
+function Base.size(blob::BlobVector)
+    (blob.length,)
 end
 
-@inline function Base.getindex(pv::BlobVector{T}, i::Int) where {T}
-    unsafe_load(get_address(pv, i))
+@inline function Base.getindex(blob::BlobVector{T}, i::Int) where {T}
+    unsafe_load(get_address(blob, i))
 end
 
-@inline function Base.setindex!(pv::BlobVector{T}, v, i::Int) where {T}
-    unsafe_store!(get_address(pv, i), v)
+@inline function Base.setindex!(blob::BlobVector{T}, v, i::Int) where {T}
+    unsafe_store!(get_address(blob, i), v)
 end
 
 function Base.IndexStyle(_::Type{BlobVector{T}}) where {T}

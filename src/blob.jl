@@ -1,5 +1,5 @@
 """
-A pointer to a `T` in some manually managed region of memory.
+A pointer to a `T` stored inside a Blob.
 """
 # TODO do we want to also keep the page address/size in here? If we complicate the loading code a little we could avoid writing it to the page, so it would only exist on the stack.
 struct Blob{T}
@@ -9,6 +9,18 @@ struct Blob{T}
         @assert isbits(T)
         new(ptr)
     end
+end
+
+function Base.pointer(blob::Blob)
+    convert(Ptr{UInt8}, blob.ptr)
+end
+
+function Base.convert(::Type{Blob{T}}, blob::Blob) where T
+    Blob{T}(blob.ptr)
+end
+
+function Base.:+(blob::Blob{T}, offset::Integer) where T
+    Blob{T}(blob.ptr + offset)
 end
 
 function rewrite_address(expr)
@@ -93,8 +105,7 @@ end
             unsafe_load(convert(Ptr{T}, blob.ptr))
         end
     else
-        # is a composite type - recursively load its fields
-        # so that specializations of this method can hook in and alter loading
+        # is a composite type - recursively load its fields so that specializations of this method can hook in and alter loading
         $(Expr(:meta, :inline))
         Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
             unsafe_load(get_address(blob, $(Val{field})))
@@ -111,8 +122,7 @@ end
             value
         end
     else
-        # is a composite type - recursively store its fields
-        # so that specializations of this method can hook in and alter storing
+        # is a composite type - recursively store its fields so that specializations of this method can hook in and alter storing
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
@@ -129,12 +139,10 @@ end
 end
 
 # pointers to other parts of the region need to be converted into offsets
-
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
     offset = unsafe_load(Blob{UInt64}(blob.ptr))
     Blob{T}(blob.ptr + offset)
 end
-
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
     offset = value.ptr - blob.ptr
     unsafe_store!(Blob{UInt64}(blob.ptr), offset)
