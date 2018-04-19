@@ -4,7 +4,7 @@ Blobs makes it easy to lay out complex data-structures within a single memory re
 
 * are relocatable - internal pointers are converted to offsets, so the entire memory region can be written to / read from disk or sent over the network without pointer patching
 * require no deserialization - they can be directly read/written without first copying the data into a Julia-native data-structure
-* require no heap allocation - field access is just pointer arithmetic and every field read/write returns an `isbits` type which can stored on the stack
+* require no additional heap allocation - field access is just pointer arithmetic and every field read/write returns an `isbits` type which can stored on the stack
 
 This makes them ideal for implementing out-of-core data-structures or for DMA to co-processors.
 
