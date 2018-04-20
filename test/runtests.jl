@@ -95,6 +95,7 @@ data = Blob{UInt8}(Libc.malloc(8), UInt64(0), UInt64(8))
 @test_nowarn BlobString(data, 8)[8]
 # pretty much any access to a unicode string touches beginning and end
 @test_throws BoundsError BlobString(data, 16)[8]
+# @inbounds doesn't work for strings - too much work to propagate
 
 # test strings and unicode
 s = "普通话/普通話"
