@@ -11,7 +11,7 @@ end
 
 # Blob
 
-blob = Blob{Int64}(Libc.malloc(16), UInt64(0), UInt64(8))
+blob = Blob{Int64}(Libc.malloc(16), 0, 8)
 @test_nowarn blob[]
 @test_throws BoundsError (blob+1)[]
 # @inbounds only kicks in if compiled
@@ -42,7 +42,7 @@ foo = @blob bfoo[]
 
 # BlobVector
 
-data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), UInt64(0), UInt64(sizeof(Int64) * 3))
+data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
 bv = BlobVector{Int64}(data, 4)
 @test_nowarn bv[3]
 @test_throws BoundsError bv[4]
@@ -64,7 +64,7 @@ bv[3] = Foo(3, 3.3)
 
 # BlobBitVector
 
-data = Blob{UInt64}(Libc.malloc(sizeof(UInt64) * 4), UInt64(0), UInt64(sizeof(UInt64) * 3))
+data = Blob{UInt64}(Libc.malloc(sizeof(UInt64) * 4), 0, sizeof(UInt64) * 3)
 bv = BlobBitVector(data, 64*4)
 @test_nowarn bv[64*3]
 @test_throws BoundsError bv[64*3 + 1]
@@ -92,9 +92,7 @@ bv2 = @blob bbv[2]
 
 # BlobString
 
-if VERSION < v"0.7.0-DEV"
-
-data = Blob{UInt8}(Libc.malloc(8), UInt64(0), UInt64(8))
+data = Blob{UInt8}(Libc.malloc(8), 0, 8)
 @test_nowarn BlobString(data, 8)[8]
 # pretty much any access to a unicode string touches beginning and end
 @test_throws BoundsError BlobString(data, 16)[8]
@@ -104,33 +102,42 @@ data = Blob{UInt8}(Libc.malloc(8), UInt64(0), UInt64(8))
 s = "普通话/普通話"
 bbs = Blobs.malloc_and_init(BlobString, s)
 bs = @blob bbs[]
+@test unsafe_string(pointer(bs), sizeof(bs)) == s
 @test bs == s
 @test repr(bs) == repr(s)
 @test collect(bs) == collect(s)
-@test search(bs, "通") == search(s, "通")
-@test rsearch(bs, "通") == rsearch(s, "通")
-@test reverse(bs) == reverse(s)
+if VERSION >= v"0.7.0-DEV"
+    @test findfirst(bs, "通") == findfirst(s, "通")
+    @test findlast(bs, "通") == findlast(s, "通")
+else
+    @test search(bs, "通") == search(s, "通")
+    @test rsearch(bs, "通") == rsearch(s, "通")
+end
 
 # test right-to-left
 s = "سلام"
 bbs = Blobs.malloc_and_init(BlobString, s)
 bs = @blob bbs[]
+@test unsafe_string(pointer(bs), sizeof(bs)) == s
 @test bs == s
 @test repr(bs) == repr(s)
 @test collect(bs) == collect(s)
-@test search(bs, "ا") == search(s, "ا")
-@test rsearch(bs, "ا") == rsearch(s, "ا")
-@test reverse(bs) == reverse(s)
+if VERSION >= v"0.7.0-DEV"
+    @test findfirst(bs, "ا") == findfirst(s, "ا")
+    @test findlast(bs, "ا") == findlast(s, "ا")
+else
+    @test search(bs, "ا") == search(s, "ا")
+    @test rsearch(bs, "ا") == rsearch(s, "ا")
+end
 
 # test string conversions
 
 @test isbits(bs)
-@test reverse(bs) isa RevString{BlobString}
 @test String(bs) isa String
 @test String(bs) == s
-@test string(bs) isa String
 
-end
+println(s)
+println("Testing: $s")
 
 # sketch of paged pmas
 
@@ -164,7 +171,7 @@ pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
 # tests fill!
 @test !any(@blob pma.mask[])
 # tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{UInt64}, pointer(pma)), 1) == sizeof(PackedMemoryArray{Int64, Float32})
+@test unsafe_load(convert(Ptr{Int64}, pointer(pma)), 1) == sizeof(PackedMemoryArray{Int64, Float32})
 # tests nested interior pointers
 pma2 = @blob pma.mask[2]
 @test (@blob pma2[]) == false

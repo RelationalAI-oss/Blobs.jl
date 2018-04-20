@@ -3,10 +3,10 @@ A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
     base::Ptr{Void}
-    offset::UInt64
-    limit::UInt64
+    offset::Int64
+    limit::Int64
 
-    function Blob{T}(base::Ptr{Void}, offset::UInt64, limit::UInt64) where {T}
+    function Blob{T}(base::Ptr{Void}, offset::Int64, limit::Int64) where {T}
         @assert isbits(T)
         new(base, offset, limit)
     end
@@ -123,16 +123,16 @@ end
 # patch pointers on the fly during load/store!
 
 function self_size(blob::Blob{T}) where T
-    sizeof(UInt64)
+    sizeof(Int64)
 end
 
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
-    offset = unsafe_load(Blob{UInt64}(blob))
+    offset = unsafe_load(Blob{Int64}(blob))
     Blob{T}(blob.base, blob.offset + offset, blob.limit)
 end
 
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
     assert_same_allocation(blob, value)
     offset = value.offset - blob.offset
-    unsafe_store!(Blob{UInt64}(blob), offset)
+    unsafe_store!(Blob{Int64}(blob), offset)
 end

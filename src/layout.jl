@@ -47,7 +47,7 @@ function init(blob::Blob{BlobVector{T}}, free::Blob{Void}, length::Int64) where 
     free + child_size(BlobVector{T}, length)
 end
 
-child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * UInt64(ceil(length / self_size(UInt64)))
+child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / self_size(UInt64)))
 
 function init(blob::Blob{BlobBitVector}, free::Blob{Void}, length::Int64)
     @blob blob.data[] = Blob{UInt64}(free)
@@ -63,10 +63,10 @@ function init(blob::Blob{BlobString}, free::Blob{Void}, length::Int64)
     free + child_size(BlobString, length)
 end
 
-child_size(::Type{BlobString}, string::Union{String, BlobString}) = string.len
+child_size(::Type{BlobString}, string::Union{String, BlobString}) = sizeof(string)
 
 function init(blob::Blob{BlobString}, free::Blob{Void}, string::Union{String, BlobString})
-    free = init(blob, free, string.len)
+    free = init(blob, free, sizeof(string))
     unsafe_copy!((@blob blob[]), string)
     free
 end
@@ -78,7 +78,7 @@ Allocate an uninitialized `Blob{T}`.
 """
 function malloc(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
-    Blob{T}(Libc.malloc(size), UInt64(0), UInt64(size))
+    Blob{T}(Libc.malloc(size), 0, size)
 end
 
 """
@@ -88,7 +88,7 @@ Allocate and initialize a new `Blob{T}`.
 """
 function malloc_and_init(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
-    blob = Blob{T}(Libc.malloc(size), UInt64(0), UInt64(size))
+    blob = Blob{T}(Libc.malloc(size), 0, size)
     used = init(blob, args...)
     @assert used - blob == size
     blob

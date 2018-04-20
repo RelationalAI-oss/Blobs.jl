@@ -34,8 +34,8 @@ Ptr{Void} @0x0000000006416020
 We can interpret this pointer as any `isbits` Julia struct:
 
 ``` julia
-julia> foo = Blob{Foo}(p, UInt64(0), UInt64(sizeof(Foo)))
-Blobs.Blob{Foo}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
+julia> foo = Blob{Foo}(p, 0, sizeof(Foo))
+Blobs.Blob{Foo}(Ptr{Void} @0x0000000004de87c0, 0, 16)
 ```
 
 (See `Blobs.malloc_and_init` for a safer way to create a fresh blob).
@@ -44,10 +44,10 @@ Use the `@blob` macro to obtain references to the fields of this struct:
 
 ``` julia
 julia> @blob foo.x
-Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
+Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0, 16)
 
 julia> @blob foo.y
-Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000008, 0x0000000000000010)
+Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 8, 16)
 ```
 
 Or to dereference those references:
@@ -63,7 +63,7 @@ julia> @blob foo.y[]
 true
 
 julia> y = @blob foo.y
-Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000008, 0x0000000000000010)
+Blobs.Blob{Bool}(Ptr{Void} @0x0000000004de87c0, 8, 16)
 
 julia> @blob y[]
 true
@@ -85,7 +85,7 @@ julia> @blob foo.y[]
 false
 
 julia> x = @blob foo.x
-Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0x0000000000000000, 0x0000000000000010)
+Blobs.Blob{Int64}(Ptr{Void} @0x0000000004de87c0, 0, 16)
 
 julia> @blob x[] = 42
 42
