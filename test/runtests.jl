@@ -29,8 +29,9 @@ foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @test pointer(@blob foo.y) == pointer(foo) + sizeof(Int64)
 
 # test ambiguous syntax
-@test_throws ErrorException eval(:(@blob foo.y[] == 2.5))
-@test_throws ErrorException eval(:(@blob foo.y == 2.5))
+error = VERSION >= v"0.7.0-DEV" ? LoadError : ErrorException
+@test_throws error eval(:(@blob foo.y[] == 2.5))
+@test_throws error eval(:(@blob foo.y == 2.5))
 
 # nested Blob
 
@@ -91,6 +92,8 @@ bv2 = @blob bbv[2]
 
 # BlobString
 
+if VERSION < v"0.7.0-DEV"
+
 data = Blob{UInt8}(Libc.malloc(8), UInt64(0), UInt64(8))
 @test_nowarn BlobString(data, 8)[8]
 # pretty much any access to a unicode string touches beginning and end
@@ -126,6 +129,8 @@ bs = @blob bbs[]
 @test String(bs) isa String
 @test String(bs) == s
 @test string(bs) isa String
+
+end
 
 # sketch of paged pmas
 
