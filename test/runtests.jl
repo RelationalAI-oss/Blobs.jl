@@ -159,7 +159,7 @@ pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
 # tests fill!
 @test !any(@blob pma.mask[])
 # tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{UInt64}, pointer(pma) + sizeof(UInt64)), 1) == sizeof(PackedMemoryArray{Int64, Float32})
+@test unsafe_load(convert(Ptr{UInt64}, pointer(pma)), 1) == sizeof(PackedMemoryArray{Int64, Float32})
 # tests nested interior pointers
 pma2 = @blob pma.mask[2]
 @test (@blob pma2[]) == false

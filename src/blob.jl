@@ -119,12 +119,18 @@ end
 end
 
 # patch pointers on the fly during load/store!
-@inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
-    unpatched_blob = unsafe_load(pointer(blob))
-    Blob{T}(blob.base, blob.offset + unpatched_blob.offset, blob.limit)
+
+function self_size(blob::Blob{T}) where T
+    sizeof(UInt64)
 end
+
+@inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
+    offset = unsafe_load(Blob{UInt64}(blob))
+    Blob{T}(blob.base, blob.offset + offset, blob.limit)
+end
+
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
     assert_same_allocation(blob, value)
-    unpatched_blob = Blob{T}(blob.base, value.offset - blob.offset, blob.limit)
-    unsafe_store!(pointer(blob), unpatched_blob)
+    offset = value.offset - blob.offset
+    unsafe_store!(Blob{UInt64}(blob), offset)
 end
