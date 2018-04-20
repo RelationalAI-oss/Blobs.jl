@@ -2,15 +2,11 @@
 struct BlobString <: AbstractString
     data::Blob{UInt8}
     len::Int64 # in bytes
-
-    function BlobString(data::Blob{UInt8}, len::Int64)
-        blob = new(data, len)
-        data + (len-1) # bounds check
-        blob
-    end
 end
 
 function Base.pointer(blob::BlobString)
+    # TODO(jamii) would prefer to boundscheck on load, but this will do for now
+    getindex(blob.data + (blob.len - 1))
     pointer(blob.data)
 end
 

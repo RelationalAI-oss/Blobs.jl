@@ -11,8 +11,9 @@ end
 
 # Blob
 
-Blob{Int64}(Libc.malloc(8), UInt64(0), UInt64(8))
-@test_throws AssertionError Blob{Int64}(Libc.malloc(8), UInt64(1), UInt64(8))
+blob = Blob{Int64}(Libc.malloc(8), UInt64(0), UInt64(8))
+@test_nowarn blob[]
+@test_throws BoundsError (blob+1)[]
 
 foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @blob foo.x[] = 1
@@ -38,33 +39,35 @@ foo = @blob bfoo[]
 # BlobVector
 
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 3), UInt64(0), UInt64(sizeof(Int64) * 3))
-BlobVector{Int64}(data, 3)
-@test_throws AssertionError BlobVector{Int64}(data, 4)
+bv = BlobVector{Int64}(data, 4)
+@test_nowarn bv[3]
+@test_throws BoundsError bv[4]
 
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = @blob bbv[]
 bv[2] = Foo(2, 2.2)
 @test bv[2] == Foo(2, 2.2)
-@test (@blob bv[2][]) == Foo(2, 2.2)
+@test (@blob bbv[2][]) == Foo(2, 2.2)
 @test length(bv) == 3
 bv[1] = Foo(1, 1.1)
 bv[3] = Foo(3, 3.3)
 # test iteration
 @test collect(bv) == [Foo(1,1.1), Foo(2,2.2), Foo(3,3.3)]
 # test interior pointers
-@test pointer(@blob bv[2]) == pointer(bv.data) + sizeof(Foo)
+@test pointer(@blob bbv[2]) == pointer(bv.data) + sizeof(Foo)
 
 # BlobBitVector
 
 data = Blob{UInt64}(Libc.malloc(sizeof(UInt64) * 3), UInt64(0), UInt64(sizeof(UInt64) * 3))
-BlobBitVector(data, 64*3)
-@test_throws AssertionError BlobBitVector(data, 64*3 + 1)
+bv = BlobBitVector(data, 64*4)
+@test_nowarn bv[64*3]
+@test_throws BoundsError bv[64*3 + 1]
 
 bbv = Blobs.malloc_and_init(BlobBitVector, 3)
 bv = @blob bbv[]
 bv[2] = true
 @test bv[2] == true
-@test (@blob bv[2][]) == true
+@test (@blob bbv[2][]) == true
 @test length(bv) == 3
 bv[1] = false
 bv[3] = false
@@ -73,7 +76,7 @@ bv[3] = false
 fill!(bv, false)
 @test collect(bv) == [false, false, false]
 # test interior pointers
-bv2 = @blob bv[2]
+bv2 = @blob bbv[2]
 @test (@blob bv2[]) == false
 @blob bv2[] = true
 @test (@blob bv2[]) == true
@@ -81,9 +84,10 @@ bv2 = @blob bv[2]
 
 # BlobString
 
-data = Blob{UInt8}(Libc.malloc(sizeof(UInt8) * 3), UInt64(0), UInt64(sizeof(UInt8) * 3))
-BlobString(data, 3)
-@test_throws AssertionError BlobString(data, 4)
+data = Blob{UInt8}(Libc.malloc(8), UInt64(0), UInt64(8))
+@test_nowarn BlobString(data, 8)[8]
+# pretty much any access to a unicode string touches beginning and end
+@test_throws BoundsError BlobString(data, 16)[8]
 
 # test strings and unicode
 s = "普通话/普通話"

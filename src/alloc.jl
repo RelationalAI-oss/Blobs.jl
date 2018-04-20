@@ -15,7 +15,7 @@ Initialize `blob`.
 Assumes that `blob` it at least `sizeof(T) + alloc_size(T, args...)` bytes long.
 """
 function init(blob::Blob{T}, args...) where T
-    init(blob, Blob{Void}(blob, sizeof(T)), args...)
+    init(blob, Blob{Void}(blob + sizeof(T)), args...)
 end
 
 """

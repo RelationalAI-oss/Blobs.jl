@@ -2,22 +2,27 @@
 struct BlobVector{T} <: AbstractArray{T, 1}
     data::Blob{T}
     length::Int64
-
-    function BlobVector{T}(data::Blob{T}, length::Int64) where {T}
-        @assert isbits(T)
-        blob = new(data, length)
-        get_address(blob, length) # bounds check
-        blob
-    end
 end
 
-@inline function get_address(blob::BlobVector{T}, i::Int) where {T}
-    (0 < i <= blob.length) || throw(BoundsError(blob, i))
+@inline function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
+    @boundscheck begin
+        (0 < i <= blob.length) || throw(BoundsError(blob, i))
+    end
     blob.data + (i-1)*sizeof(T)
 end
 
-function get_address(blob::Blob{BlobVector{T}}, i::Int) where {T}
-    get_address(unsafe_load(blob), i)
+# blob interface
+
+function Base.size(blob::Blob{BlobVector})
+    ((@blob blob.length[]),)
+end
+
+function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
+    Base.IndexLinear()
+end
+
+@inline function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+    get_address(blob[], i)
 end
 
 # array interface
@@ -26,22 +31,27 @@ function Base.size(blob::BlobVector)
     (blob.length,)
 end
 
-@inline function Base.getindex(blob::BlobVector{T}, i::Int) where {T}
-    unsafe_load(get_address(blob, i))
-end
-
-@inline function Base.setindex!(blob::BlobVector{T}, v, i::Int) where {T}
-    unsafe_store!(get_address(blob, i), v)
-end
-
-function Base.IndexStyle(_::Type{BlobVector{T}}) where {T}
+function Base.IndexStyle(_::Type{BlobVector{T}}) where T
     Base.IndexLinear()
+end
+
+@inline function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
+    @boundscheck begin
+        (0 < i <= blob.length) || throw(BoundsError(blob, i))
+    end
+    getindex(blob.data + (i-1)*sizeof(T))
+end
+
+@inline function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
+    @boundscheck begin
+        (0 < i <= blob.length) || throw(BoundsError(blob, i))
+    end
+    setindex!(blob.data + (i-1)*sizeof(T), v)
 end
 
 # copying, with correct handling of overlapping regions
 # TODO use memcopy
-function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T},
-    soff::Int, n::Int) where {T}
+function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int) where T
     if doff < soff
         for i in 0:n-1 dest[doff+i] = src[soff+i] end
     else

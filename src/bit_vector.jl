@@ -1,42 +1,45 @@
-"A fixed-length bit vector whose data is stored in a Blob."
-struct BlobBitVector <: AbstractArray{Bool, 1}
-    data::Blob{UInt64}
-    length::Int64
-
-    function BlobBitVector(data::Blob{UInt64}, length::Int64)
-        blob = new(data, length)
-        get_address(blob, length) # bounds check
-        blob
-    end
-end
-
 struct BlobBit
     data::Blob{UInt64}
     mask::UInt64
 end
 
-function get_address(blob::BlobBitVector, i::Int)
-    (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
+@inline function Base.getindex(blob::BlobBit)::Bool
+    (blob.data[] & blob.mask) != 0
+end
+
+@inline function Base.setindex!(blob::BlobBit, v::Bool)::Bool
+    c = blob.data[]
+    c = ifelse(v, c | blob.mask, c & ~blob.mask)
+    blob.data[] = c
+    v
+end
+
+"A fixed-length bit vector whose data is stored in a Blob."
+struct BlobBitVector <: AbstractArray{Bool, 1}
+    data::Blob{UInt64}
+    length::Int64
+end
+
+@inline function get_address(blob::BlobBitVector, i::Int)::BlobBit
+    @boundscheck begin
+        (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
+    end
     i1, i2 = Base.get_chunks_id(i)
     BlobBit(blob.data + (i1-1)*sizeof(UInt64), UInt64(1) << i2)
 end
 
-function get_address(blob::Blob{BlobBitVector}, i::Int)
-    get_address(unsafe_load(blob), i)
+# blob interface
+
+function Base.size(blob::Blob{BlobBitVector})
+    ((@blob blob.length[]),)
 end
 
-function get_address(blob::BlobBit)
-    unsafe_load(blob)
+function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
+    Base.IndexLinear()
 end
 
-function Base.unsafe_load(blob::BlobBit)
-    (unsafe_load(blob.data) & blob.mask) != 0
-end
-
-function Base.unsafe_store!(blob::BlobBit, v::Bool)
-    c = unsafe_load(blob.data)
-    c = ifelse(v, c | blob.mask, c & ~blob.mask)
-    unsafe_store!(blob.data, c)
+@inline function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
+    get_address(blob[], i)
 end
 
 function unsafe_resize!(blob::BlobBitVector, length::Int64)
@@ -49,19 +52,19 @@ function Base.size(blob::BlobBitVector)
     (blob.length,)
 end
 
-function Base.getindex(blob::BlobBitVector, i::Int)
-    unsafe_load(get_address(blob, i))
-end
-
-function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)
-    unsafe_store!(get_address(blob, i), v)
-end
-
 function Base.IndexStyle(_::Type{BlobBitVector})
     Base.IndexLinear()
 end
 
-function Base.findprevnot(blob::BlobBitVector, start::Int)
+function Base.getindex(blob::BlobBitVector, i::Int)::Bool
+    get_address(blob, i)[]
+end
+
+function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)::Bool
+    get_address(blob, i)[] = v
+end
+
+function Base.findprevnot(blob::BlobBitVector, start::Int)::Int
     start > 0 || return 0
     start > length(blob) && throw(BoundsError(blob, start))
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
@@ -71,7 +74,7 @@ function Base.findprevnot(blob::BlobBitVector, start::Int)
     start
 end
 
-function Base.findnextnot(blob::BlobBitVector, start::Int)
+function Base.findnextnot(blob::BlobBitVector, start::Int)::Int
     start > 0 || throw(BoundsError(blob, start))
     start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code

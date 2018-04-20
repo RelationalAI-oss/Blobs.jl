@@ -9,6 +9,7 @@ macro splice(iterator, body)
 end
 
 include("blob.jl")
+include("macro.jl")
 include("vector.jl")
 include("bit_vector.jl")
 include("string.jl")
