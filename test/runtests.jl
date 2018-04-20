@@ -11,9 +11,12 @@ end
 
 # Blob
 
-blob = Blob{Int64}(Libc.malloc(8), UInt64(0), UInt64(8))
+blob = Blob{Int64}(Libc.malloc(16), UInt64(0), UInt64(8))
 @test_nowarn blob[]
 @test_throws BoundsError (blob+1)[]
+# @inbounds only kicks in if compiled
+f1(blob) = @inbounds (blob+1)[]
+f1(blob)
 
 foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @blob foo.x[] = 1
@@ -38,10 +41,12 @@ foo = @blob bfoo[]
 
 # BlobVector
 
-data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 3), UInt64(0), UInt64(sizeof(Int64) * 3))
+data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), UInt64(0), UInt64(sizeof(Int64) * 3))
 bv = BlobVector{Int64}(data, 4)
 @test_nowarn bv[3]
 @test_throws BoundsError bv[4]
+f2(bv) = @inbounds bv[4]
+f2(bv)
 
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = @blob bbv[]
@@ -58,10 +63,12 @@ bv[3] = Foo(3, 3.3)
 
 # BlobBitVector
 
-data = Blob{UInt64}(Libc.malloc(sizeof(UInt64) * 3), UInt64(0), UInt64(sizeof(UInt64) * 3))
+data = Blob{UInt64}(Libc.malloc(sizeof(UInt64) * 4), UInt64(0), UInt64(sizeof(UInt64) * 3))
 bv = BlobBitVector(data, 64*4)
 @test_nowarn bv[64*3]
 @test_throws BoundsError bv[64*3 + 1]
+f3(bv) = @inbounds bv[64*3 + 1]
+f3(bv)
 
 bbv = Blobs.malloc_and_init(BlobBitVector, 3)
 bv = @blob bbv[]

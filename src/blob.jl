@@ -41,7 +41,7 @@ end
     end
 end
 
-@inline function Base.getindex(blob::Blob{T}) where T
+@inbounds begin (blob+1)[] end function Base.getindex(blob::Blob{T}) where T
     boundscheck(blob)
     unsafe_load(blob)
 end
@@ -55,7 +55,7 @@ end
     end
 end
 
-@inline function Base.setindex!(blob::Blob{T}, value::T) where T
+@inbounds begin (blob+1)[] end function Base.setindex!(blob::Blob{T}, value::T) where T
     boundscheck(blob)
     unsafe_store!(blob, value)
 end

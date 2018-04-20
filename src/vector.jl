@@ -21,7 +21,7 @@ function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
     Base.IndexLinear()
 end
 
-@inline function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+@inbounds begin (blob+1)[] end function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
     get_address(blob[], i)
 end
 
@@ -35,14 +35,14 @@ function Base.IndexStyle(_::Type{BlobVector{T}}) where T
     Base.IndexLinear()
 end
 
-@inline function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
+@inbounds begin (blob+1)[] end function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
     getindex(blob.data + (i-1)*sizeof(T))
 end
 
-@inline function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
+@inbounds begin (blob+1)[] end function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
