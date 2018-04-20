@@ -46,12 +46,29 @@ Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
     unsafe_load(blob)
 end
 
+"""
+    self_size(::Type{T}, args...) where {T}
+
+The number of bytes needed to allocate `T` itself.
+
+Defaults to `sizeof(T)`.
+"""
+self_size(::Type{T}) where T = sizeof(T)
+
+@generated function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
+    quote
+        +(0, $(@splice j in 1:(i-1) quote
+            self_size(fieldtype(T, $j))
+        end))
+    end
+end
+
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(fieldnames(T), field)
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(fieldoffset(T, i)))
+        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, Val{i})))
     end
 end
 

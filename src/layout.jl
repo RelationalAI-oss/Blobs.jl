@@ -1,13 +1,4 @@
 """
-    self_size(::Type{T}, args...) where {T}
-
-The number of bytes needed to allocate `T` itself.
-
-Defaults to `sizeof(T)`.
-"""
-self_size(::Type{T}) where T = sizeof(T)
-
-"""
     child_size(::Type{T}, args...) where {T}
 
 The number of bytes needed to allocate children of `T`, not including `self_size(T)`.
