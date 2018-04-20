@@ -21,7 +21,7 @@ function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
     Base.IndexLinear()
 end
 
-@inbounds begin (blob+1)[] end function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+Base.@propagate_inboundsfunction Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
     get_address(blob[], i)
 end
 

@@ -3,11 +3,11 @@ struct BlobBit
     mask::UInt64
 end
 
-@inbounds begin (blob+1)[] end function Base.getindex(blob::BlobBit)::Bool
+Base.@propagate_inboundsfunction Base.getindex(blob::BlobBit)::Bool
     (blob.data[] & blob.mask) != 0
 end
 
-@inbounds begin (blob+1)[] end function Base.setindex!(blob::BlobBit, v::Bool)::Bool
+Base.@propagate_inboundsfunction Base.setindex!(blob::BlobBit, v::Bool)::Bool
     c = blob.data[]
     c = ifelse(v, c | blob.mask, c & ~blob.mask)
     blob.data[] = c
@@ -38,7 +38,7 @@ function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
     Base.IndexLinear()
 end
 
-@inbounds begin (blob+1)[] end function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
+Base.@propagate_inboundsfunction Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
     get_address(blob[], i)
 end
 

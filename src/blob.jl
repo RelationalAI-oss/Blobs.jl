@@ -35,13 +35,13 @@ end
 
 @inline function boundscheck(blob::Blob{T}) where T
     @boundscheck begin
-        if (blob.offset < 0) || (blob.offset + sizeof(T) > blob.limit)
+        if (blob.offset < 0) || (blob.offset + self_size(T) > blob.limit)
             throw(BoundsError(blob))
         end
     end
 end
 
-@inbounds begin (blob+1)[] end function Base.getindex(blob::Blob{T}) where T
+Base.@propagate_inboundsfunction Base.getindex(blob::Blob{T}) where T
     boundscheck(blob)
     unsafe_load(blob)
 end
@@ -55,7 +55,7 @@ end
     end
 end
 
-@inbounds begin (blob+1)[] end function Base.setindex!(blob::Blob{T}, value::T) where T
+Base.@propagate_inboundsfunction Base.setindex!(blob::Blob{T}, value::T) where T
     boundscheck(blob)
     unsafe_store!(blob, value)
 end
