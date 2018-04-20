@@ -12,16 +12,16 @@ struct Blob{T}
     end
 end
 
+function Blob{T}(blob::Blob) where T
+    Blob{T}(blob.base, blob.offset, blob.limit)
+end
+
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert blob1.base == blob2.base "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
 function Base.pointer(blob::Blob{T}) where T
     convert(Ptr{T}, blob.base + blob.offset)
-end
-
-function Base.convert(::Type{Blob{T}}, blob::Blob) where T
-    Blob{T}(blob.base, blob.offset, blob.limit)
 end
 
 function Base.:+(blob::Blob{T}, offset::Integer) where T
