@@ -13,7 +13,7 @@ include("macro.jl")
 include("vector.jl")
 include("bit_vector.jl")
 include("string.jl")
-include("alloc.jl")
+include("layout.jl")
 
 export Blob, BlobVector, BlobBitVector, BlobString, @blob
 

@@ -8,7 +8,7 @@ end
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
-    blob.data + (i-1)*sizeof(T)
+    blob.data + (i-1)*self_size(T)
 end
 
 # blob interface
@@ -21,7 +21,7 @@ function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
     Base.IndexLinear()
 end
 
-Base.@propagate_inboundsfunction Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
     get_address(blob[], i)
 end
 
@@ -35,18 +35,18 @@ function Base.IndexStyle(_::Type{BlobVector{T}}) where T
     Base.IndexLinear()
 end
 
-@inbounds begin (blob+1)[] end function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
+Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
-    getindex(blob.data + (i-1)*sizeof(T))
+    getindex(blob.data + (i-1)*self_size(T))
 end
 
-@inbounds begin (blob+1)[] end function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
+Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
-    setindex!(blob.data + (i-1)*sizeof(T), v)
+    setindex!(blob.data + (i-1)*self_size(T), v)
 end
 
 # copying, with correct handling of overlapping regions

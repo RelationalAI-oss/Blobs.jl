@@ -137,11 +137,11 @@ struct PackedMemoryArray{K,V}
      #...other stuff
 end
 
-function Blobs.alloc_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
+function Blobs.child_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {K,V}
     T = PackedMemoryArray{K,V}
-    +(Blobs.alloc_size(fieldtype(T, :keys), length),
-      Blobs.alloc_size(fieldtype(T, :values), length),
-      Blobs.alloc_size(fieldtype(T, :mask), length))
+    +(Blobs.child_size(fieldtype(T, :keys), length),
+      Blobs.child_size(fieldtype(T, :values), length),
+      Blobs.child_size(fieldtype(T, :mask), length))
   end
 
 function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Void}, length::Int64) where {K,V}
@@ -182,16 +182,16 @@ struct Bar
     e::Blob{Quux}
 end
 
-function Blobs.alloc_size(::Type{Quux}, x_len::Int64, y::Float64)
+function Blobs.child_size(::Type{Quux}, x_len::Int64, y::Float64)
     T = Quux
-    +(Blobs.alloc_size(fieldtype(T, :x), x_len))
+    +(Blobs.child_size(fieldtype(T, :x), x_len))
 end
 
-function Blobs.alloc_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
     T = Bar
-    +(Blobs.alloc_size(fieldtype(T, :b), b_len),
-      Blobs.alloc_size(fieldtype(T, :d), d_len),
-      Blobs.alloc_size(fieldtype(T, :e), x_len, y))
+    +(Blobs.child_size(fieldtype(T, :b), b_len),
+      Blobs.child_size(fieldtype(T, :d), d_len),
+      Blobs.child_size(fieldtype(T, :e), x_len, y))
 end
 
 function Blobs.init(quux::Blob{Quux}, free::Blob{Void}, x_len::Int64, y::Float64)

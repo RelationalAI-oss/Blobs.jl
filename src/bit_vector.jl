@@ -3,11 +3,11 @@ struct BlobBit
     mask::UInt64
 end
 
-Base.@propagate_inboundsfunction Base.getindex(blob::BlobBit)::Bool
+Base.@propagate_inbounds function Base.getindex(blob::BlobBit)::Bool
     (blob.data[] & blob.mask) != 0
 end
 
-Base.@propagate_inboundsfunction Base.setindex!(blob::BlobBit, v::Bool)::Bool
+Base.@propagate_inbounds function Base.setindex!(blob::BlobBit, v::Bool)::Bool
     c = blob.data[]
     c = ifelse(v, c | blob.mask, c & ~blob.mask)
     blob.data[] = c
@@ -25,7 +25,7 @@ end
         (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
     end
     i1, i2 = Base.get_chunks_id(i)
-    BlobBit(blob.data + (i1-1)*sizeof(UInt64), UInt64(1) << i2)
+    BlobBit(blob.data + (i1-1)*self_size(UInt64), UInt64(1) << i2)
 end
 
 # blob interface
@@ -38,7 +38,7 @@ function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
     Base.IndexLinear()
 end
 
-Base.@propagate_inboundsfunction Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
+Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
     get_address(blob[], i)
 end
 
