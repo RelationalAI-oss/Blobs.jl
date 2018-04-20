@@ -1,5 +1,5 @@
 """
-A pointer to a `T` store!d inside a Blob.
+A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
     base::Ptr{Void}
