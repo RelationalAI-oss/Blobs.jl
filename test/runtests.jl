@@ -29,9 +29,10 @@ foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 @test pointer(@blob foo.y) == pointer(foo) + sizeof(Int64)
 
 # test ambiguous syntax
-error = VERSION >= v"0.7.0-DEV" ? LoadError : ErrorException
-@test_throws error eval(:(@blob foo.y[] == 2.5))
-@test_throws error eval(:(@blob foo.y == 2.5))
+if VERSION < v"0.7.0-DEV"
+    @test_throws ErrorException eval(:(@blob foo.y[] == 2.5))
+    @test_throws ErrorException eval(:(@blob foo.y == 2.5))
+end
 
 # nested Blob
 

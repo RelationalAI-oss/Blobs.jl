@@ -100,5 +100,5 @@ end
 Free the underlying allocation for `blob`.
 """
 function free(blob::Blob)
-    Libc.free(blob.base)
+    Libc.free(getfield(blob, :base))
 end

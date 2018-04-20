@@ -13,29 +13,29 @@ struct Blob{T}
 end
 
 function Blob{T}(blob::Blob) where T
-    Blob{T}(blob.base, blob.offset, blob.limit)
+    Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
-    @assert blob1.base == blob2.base "These blobs do not share the same allocation: $blob1 - $blob2"
+    @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
 function Base.pointer(blob::Blob{T}) where T
-    convert(Ptr{T}, blob.base + blob.offset)
+    convert(Ptr{T}, getfield(blob, :base) + getfield(blob, :offset))
 end
 
 function Base.:+(blob::Blob{T}, offset::Integer) where T
-    Blob{T}(blob.base, blob.offset + offset, blob.limit)
+    Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
 end
 
 function Base.:-(blob1::Blob, blob2::Blob)
     assert_same_allocation(blob1, blob2)
-    blob1.offset - blob2.offset
+    getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
 @inline function boundscheck(blob::Blob{T}) where T
     @boundscheck begin
-        if (blob.offset < 0) || (blob.offset + self_size(T) > blob.limit)
+        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
             throw(BoundsError(blob))
         end
     end
@@ -128,11 +128,11 @@ end
 
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
     offset = unsafe_load(Blob{Int64}(blob))
-    Blob{T}(blob.base, blob.offset + offset, blob.limit)
+    Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
 end
 
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
     assert_same_allocation(blob, value)
-    offset = value.offset - blob.offset
+    offset = getfield(value, :offset) - getfield(blob, :offset)
     unsafe_store!(Blob{Int64}(blob), offset)
 end
