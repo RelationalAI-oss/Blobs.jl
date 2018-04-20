@@ -46,6 +46,7 @@ Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
     unsafe_load(blob)
 end
 
+# TODO(jamii) do we need to align data?
 """
     self_size(::Type{T}, args...) where {T}
 
@@ -53,7 +54,22 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-self_size(::Type{T}) where T = sizeof(T)
+@generated function self_size(::Type{T}) where T
+    @assert isleaftype(T)
+    if isempty(fieldnames(T))
+        quote
+            $(Expr(:meta, :inline))
+            sizeof(T)
+        end
+    else
+        quote
+            $(Expr(:meta, :inline))
+            +(0, $(@splice i in 1:length(fieldnames(T)) quote
+                self_size(fieldtype(T, $i))
+            end))
+        end
+    end
+end
 
 @generated function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
     quote
@@ -68,7 +84,7 @@ end
     @assert i != 0 "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, Val{i})))
+        Blob{$(fieldtype(T, i))}(blob + blob_offset(T, $(Val{i})))
     end
 end
 
@@ -78,19 +94,17 @@ Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where 
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-@inline function Base.setindex!(blob::Blob{T}, value) where T
+Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
 @generated function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
-        # is a primitive type
         quote
             $(Expr(:meta, :inline))
             unsafe_load(pointer(blob))
         end
     else
-        # is a composite type - recursively load its fields so that specializations of this method can hook in and alter loading
         quote
             $(Expr(:meta, :inline))
             $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
@@ -102,14 +116,12 @@ end
 
 @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
-        # is a primitive type
         quote
             $(Expr(:meta, :inline))
             unsafe_store!(pointer(blob), value)
             value
         end
     else
-        # is a composite type - recursively store! its fields so that specializations of this method can hook in and alter storing
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
@@ -122,7 +134,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-function self_size(blob::Blob{T}) where T
+function self_size(::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 

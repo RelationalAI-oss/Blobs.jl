@@ -47,7 +47,7 @@ function init(blob::Blob{BlobVector{T}}, free::Blob{Void}, length::Int64) where 
     free + child_size(BlobVector{T}, length)
 end
 
-child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / self_size(UInt64)))
+child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / 64))
 
 function init(blob::Blob{BlobBitVector}, free::Blob{Void}, length::Int64)
     @blob blob.data[] = Blob{UInt64}(free)
