@@ -21,7 +21,7 @@ end
 if VERSION >= v"0.7.0-DEV"
 
 function Base.propertynames(::Blob{T}, private=false) where T
-    Base.propertynames(T, private)
+    fieldnames(T)
 end
 
 function Base.getproperty(blob::Blob{T}, field::Symbol) where T
