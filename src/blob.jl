@@ -91,10 +91,12 @@ end
         end
     else
         # is a composite type - recursively load its fields so that specializations of this method can hook in and alter loading
-        $(Expr(:meta, :inline))
-        Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-            unsafe_load(getindex(blob, $(Val{field})))
-        end)
+        quote
+            $(Expr(:meta, :inline))
+            $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
+                unsafe_load(getindex(blob, $(Val{field})))
+            end))
+        end
     end
 end
 
