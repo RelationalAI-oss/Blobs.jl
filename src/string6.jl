@@ -108,7 +108,7 @@ function Base.getindex(s::BlobString, r::UnitRange{Int})
         throw(BoundsError())
     end
     j = nextind(s,j)-1
-    unsafe_string(pointer(s,i), j-i+1)
+    BlobString(s.data + (i-1), j-i+1)
 end
 
 function Base.search(s::BlobString, c::Char, i::Integer = 1)

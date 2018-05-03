@@ -109,13 +109,14 @@ function Base.getindex(s::BlobString, r::UnitRange{Int})
         @inbounds isvalid(s, j) || Base.string_index_err(s, j)
     end
     j = nextind(s, j) - 1
-    n = j - i + 1
-    ss = _string_n(n)
-    p = pointer(ss)
-    for k = 1:n
-        unsafe_store!(p, codeunit(s, i + k - 1), k)
-    end
-    return ss
+    # n = j - i + 1
+    # ss = _string_n(n)
+    # p = pointer(ss)
+    # for k = 1:n
+    #     unsafe_store!(p, codeunit(s, i + k - 1), k)
+    # end
+    # return ss
+    BlobString(s.data + (i-1), j-i+1)
 end
 
 function Base.length(s::BlobString, i::Int, j::Int)

@@ -149,6 +149,14 @@ end
 println(s)
 println("Testing: $s")
 
+# test string slices
+
+s = "aye bee sea"
+bbs = Blobs.malloc_and_init(BlobString, s)
+bs = @blob bbs[]
+@test bs[5:7] isa BlobString
+@test bs[5:7] == "bee"
+
 # sketch of paged pmas
 
 struct PackedMemoryArray{K,V}
