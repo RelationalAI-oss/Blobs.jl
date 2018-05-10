@@ -15,7 +15,7 @@ This library does not protect against:
 * giving an incorrect length when creating a `Blob`
 * using a `Blob` after freeing the underlying allocation
 
-Apart from that, all other operations are safe. User error or invalid data can cause `AssertionError` but cannot segfault the program or modify memory outside the blob.
+Apart from that, all other operations are safe. User error or invalid data can cause `AssertionError` or `BoundsError` but cannot segfault the program or modify memory outside the blob.
 
 ## Usage
 
