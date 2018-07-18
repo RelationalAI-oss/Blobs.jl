@@ -36,7 +36,8 @@ ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), s, sizeof(s))
 
 ## required core functionality ##
 
-Base.@propagate_inbounds function Base.next(s::BlobString, i::Int)
+Base.@propagate_inbounds function Base.iterate(s::BlobString, i::Int=firstindex(s))
+    i > ncodeunits(s) && return nothing
     b = codeunit(s, i)
     u = UInt32(b) << 24
     Base.between(b, 0x80, 0xf7) || return reinterpret(Char, u), i+1
