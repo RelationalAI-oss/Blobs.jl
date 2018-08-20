@@ -9,12 +9,11 @@ macro splice(iterator, body)
 end
 
 include("blob.jl")
-include("macro.jl")
 include("vector.jl")
 include("bit_vector.jl")
 include("string.jl")
 include("layout.jl")
 
-export Blob, BlobVector, BlobBitVector, BlobString, @blob
+export Blob, BlobVector, BlobBitVector, BlobString
 
 end

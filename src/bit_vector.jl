@@ -31,7 +31,7 @@ end
 # blob interface
 
 function Base.size(blob::Blob{BlobBitVector})
-    ((@blob blob.length[]),)
+    (blob.length[],)
 end
 
 function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
@@ -43,7 +43,7 @@ Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobBitVector}, i::In
 end
 
 function unsafe_resize!(blob::BlobBitVector, length::Int64)
-    @blob blob.length[] = length
+    blob.length[] = length
 end
 
 # array interface

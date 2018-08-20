@@ -20,21 +20,21 @@ if Base.JLOptions().check_bounds == 0
 end
 
 foo = Blobs.malloc_and_init(Foo)
-@blob foo.x[] = 1
-@test (@blob foo.x[]) == 1
-@blob foo.y[] = 2.5
-@test (@blob foo.y[]) == 2.5
-@test (@blob foo[]) == Foo(1,2.5)
+foo.x[] = 1
+@test foo.x[] == 1
+foo.y[] = 2.5
+@test foo.y[] == 2.5
+@test foo[] == Foo(1,2.5)
 # test interior pointers
-@test (@blob foo) == foo
-@test pointer(@blob foo.y) == pointer(foo) + sizeof(Int64)
+@test foo == foo
+@test pointer(foo.y) == pointer(foo) + sizeof(Int64)
 
 # nested Blob
 
 bfoo = Blobs.malloc_and_init(Blob{Foo})
-foo = @blob bfoo[]
-@blob foo.x[] = 1
-@test (@blob foo.x[]) == 1
+foo = bfoo[]
+foo.x[] = 1
+@test foo.x[] == 1
 
 # BlobVector
 
@@ -50,17 +50,17 @@ if Base.JLOptions().check_bounds == 0
 end
 
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
-bv = @blob bbv[]
+bv = bbv[]
 bv[2] = Foo(2, 2.2)
 @test bv[2] == Foo(2, 2.2)
-@test (@blob bbv[2][]) == Foo(2, 2.2)
+@test bbv[2][] == Foo(2, 2.2)
 @test length(bv) == 3
 bv[1] = Foo(1, 1.1)
 bv[3] = Foo(3, 3.3)
 # test iteration
 @test collect(bv) == [Foo(1,1.1), Foo(2,2.2), Foo(3,3.3)]
 # test interior pointers
-@test pointer(@blob bbv[2]) - pointer(bv.data) == Blobs.self_size(Foo)
+@test pointer(bbv[2]) - pointer(bv.data) == Blobs.self_size(Foo)
 
 # BlobBitVector
 
@@ -79,10 +79,10 @@ if Base.JLOptions().check_bounds == 0
 end
 
 bbv = Blobs.malloc_and_init(BlobBitVector, 3)
-bv = @blob bbv[]
+bv = bbv[]
 bv[2] = true
 @test bv[2] == true
-@test (@blob bbv[2][]) == true
+@test bbv[2][] == true
 @test length(bv) == 3
 bv[1] = false
 bv[3] = false
@@ -91,10 +91,10 @@ bv[3] = false
 fill!(bv, false)
 @test collect(bv) == [false, false, false]
 # test interior pointers
-bv2 = @blob bbv[2]
-@test (@blob bv2[]) == false
-@blob bv2[] = true
-@test (@blob bv2[]) == true
+bv2 = bbv[2]
+@test bv2[] == false
+bv2[] = true
+@test bv2[] == true
 @test bv[2] == true
 
 # BlobString
@@ -110,7 +110,7 @@ data = Blob{UInt8}(Libc.malloc(8), 0, 8)
 # test strings and unicode
 s = "普通话/普通話"
 bbs = Blobs.malloc_and_init(BlobString, s)
-bs = @blob bbs[]
+bs = bbs[]
 @test unsafe_string(pointer(bs), sizeof(bs)) == s
 @test bs == s
 @test repr(bs) == repr(s)
@@ -121,7 +121,7 @@ bs = @blob bbs[]
 # test right-to-left
 s = "سلام"
 bbs = Blobs.malloc_and_init(BlobString, s)
-bs = @blob bbs[]
+bs = bbs[]
 @test unsafe_string(pointer(bs), sizeof(bs)) == s
 @test bs == s
 @test repr(bs) == repr(s)
@@ -142,7 +142,7 @@ println("Testing: $s")
 
 s = "aye bee sea"
 bbs = Blobs.malloc_and_init(BlobString, s)
-bs = @blob bbs[]
+bs = bbs[]
 @test bs[5:7] isa BlobString
 @test bs[5:7] == "bee"
 
@@ -164,27 +164,27 @@ function Blobs.child_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {
   end
 
 function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Nothing}, length::Int64) where {K,V}
-    free = Blobs.init((@blob pma.keys), free, length)
-    free = Blobs.init((@blob pma.values), free, length)
-    free = Blobs.init((@blob pma.mask), free, length)
-    fill!((@blob pma.mask[]), false)
-    @blob pma.count[] = 0
+    free = Blobs.init(pma.keys, free, length)
+    free = Blobs.init(pma.values, free, length)
+    free = Blobs.init(pma.mask, free, length)
+    fill!(pma.mask[], false)
+    pma.count[] = 0
     free
 end
 
 pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
-@test (@blob pma.count[]) == 0
-@test (@blob pma.keys.length[]) == 3
+@test pma.count[] == 0
+@test pma.keys.length[] == 3
 # tests fill!
-@test !any(@blob pma.mask[])
+@test !any(pma.mask[])
 # tests pointer <-> offset conversion
 @test unsafe_load(convert(Ptr{Int64}, pointer(pma)), 1) == Blobs.self_size(PackedMemoryArray{Int64, Float32})
 # tests nested interior pointers
-pma2 = @blob pma.mask[2]
-@test (@blob pma2[]) == false
-@blob pma2[] = true
-@test (@blob pma2[]) == true
-@test (@blob pma.mask[2][]) == true
+pma2 = pma.mask[2]
+@test pma2[] == false
+pma2[] = true
+@test pma2[] == true
+@test pma.mask[2][] == true
 
 # test api works ok with varying sizes
 
@@ -216,26 +216,26 @@ function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_le
 end
 
 function Blobs.init(quux::Blob{Quux}, free::Blob{Nothing}, x_len::Int64, y::Float64)
-    free = Blobs.init((@blob quux.x), free, x_len)
-    @blob quux.y[] = y
+    free = Blobs.init(quux.x, free, x_len)
+    quux.y[] = y
     free
 end
 
 function Blobs.init(bar::Blob{Bar}, free::Blob{Nothing}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
-    free = Blobs.init((@blob bar.b), free, b_len)
-    free = Blobs.init((@blob bar.d), free, d_len)
-    free = Blobs.init((@blob bar.e), free, x_len, y)
-    @blob bar.c[] = c
+    free = Blobs.init(bar.b, free, b_len)
+    free = Blobs.init(bar.d, free, d_len)
+    free = Blobs.init(bar.e, free, x_len, y)
+    bar.c[] = c
     free
 end
 
 bar = Blobs.malloc_and_init(Bar, 10, false, 20, 15, 1.5)
-quux = @blob bar.e[]
+quux = bar.e[]
 
-@test length(@blob bar.b[]) == 10
-@test (@blob bar.c[]) == false
-@test length(@blob bar.d[]) == 20
-@test length(@blob quux.x[]) == 15
-@test (@blob quux.y[]) == 1.5
+@test length(bar.b[]) == 10
+@test bar.c[] == false
+@test length(bar.d[]) == 20
+@test length(quux.x[]) == 15
+@test quux.y[] == 1.5
 
 end

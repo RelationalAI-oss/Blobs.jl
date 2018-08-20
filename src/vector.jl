@@ -14,7 +14,7 @@ end
 # blob interface
 
 function Base.size(blob::Blob{BlobVector})
-    ((@blob blob.length[]),)
+    (blob.length[],)
 end
 
 function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
