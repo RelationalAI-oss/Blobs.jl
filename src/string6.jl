@@ -174,7 +174,7 @@ function Base.string(a::BlobString...)
     out = Base._string_n(n)
     offs = 1
     for str in a
-        unsafe_copy!(pointer(out,offs), pointer(str), str.len)
+        unsafe_copyto!(pointer(out,offs), pointer(str), str.len)
         offs += str.len
     end
     return out

@@ -1,8 +1,7 @@
 module TestBlobs
 
 using Blobs
-import Blobs
-using Base.Test
+using Test
 
 struct Foo
     x::Int64
@@ -148,7 +147,7 @@ end
 
 # test string conversions
 
-@test isbits(bs)
+@test isbitstype(typeof(bs))
 @test String(bs) isa String
 @test String(bs) == s
 
@@ -180,7 +179,7 @@ function Blobs.child_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {
       Blobs.child_size(fieldtype(T, :mask), length))
   end
 
-function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Void}, length::Int64) where {K,V}
+function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Nothing}, length::Int64) where {K,V}
     free = Blobs.init((@blob pma.keys), free, length)
     free = Blobs.init((@blob pma.values), free, length)
     free = Blobs.init((@blob pma.mask), free, length)
@@ -232,13 +231,13 @@ function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_le
       Blobs.child_size(fieldtype(T, :e), x_len, y))
 end
 
-function Blobs.init(quux::Blob{Quux}, free::Blob{Void}, x_len::Int64, y::Float64)
+function Blobs.init(quux::Blob{Quux}, free::Blob{Nothing}, x_len::Int64, y::Float64)
     free = Blobs.init((@blob quux.x), free, x_len)
     @blob quux.y[] = y
     free
 end
 
-function Blobs.init(bar::Blob{Bar}, free::Blob{Void}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+function Blobs.init(bar::Blob{Bar}, free::Blob{Nothing}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
     free = Blobs.init((@blob bar.b), free, b_len)
     free = Blobs.init((@blob bar.d), free, d_len)
     free = Blobs.init((@blob bar.e), free, x_len, y)

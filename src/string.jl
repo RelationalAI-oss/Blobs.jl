@@ -11,9 +11,9 @@ function Base.pointer(blob::BlobString, i::Integer)
     pointer(blob.data + (i-1))
 end
 
-function Base.unsafe_copy!(blob::BlobString, string::Union{BlobString, String})
+function Base.unsafe_copyto!(blob::BlobString, string::Union{BlobString, String})
     @assert blob.len >= sizeof(string)
-    unsafe_copy!(pointer(blob), pointer(string), sizeof(string))
+    unsafe_copyto!(pointer(blob), pointer(string), sizeof(string))
 end
 
 function Base.String(blob::BlobString)

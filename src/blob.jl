@@ -2,12 +2,12 @@
 A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
-    base::Ptr{Void}
+    base::Ptr{Nothing}
     offset::Int64
     limit::Int64
 
-    function Blob{T}(base::Ptr{Void}, offset::Int64, limit::Int64) where {T}
-        @assert isbits(T)
+    function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
+        @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
