@@ -4,7 +4,7 @@ struct BlobVector{T} <: AbstractArray{T, 1}
     length::Int64
 end
 
-@inline function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
+Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
@@ -36,17 +36,11 @@ function Base.IndexStyle(_::Type{BlobVector{T}}) where T
 end
 
 Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
-    @boundscheck begin
-        (0 < i <= blob.length) || throw(BoundsError(blob, i))
-    end
-    getindex(blob.data + (i-1)*self_size(T))
+    get_address(blob, i)[]
 end
 
 Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
-    @boundscheck begin
-        (0 < i <= blob.length) || throw(BoundsError(blob, i))
-    end
-    setindex!(blob.data + (i-1)*self_size(T), v)
+    get_address(blob, i)[] = v
 end
 
 # copying, with correct handling of overlapping regions

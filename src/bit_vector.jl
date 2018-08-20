@@ -20,7 +20,7 @@ struct BlobBitVector <: AbstractArray{Bool, 1}
     length::Int64
 end
 
-@inline function get_address(blob::BlobBitVector, i::Int)::BlobBit
+Base.@propagate_inbounds function get_address(blob::BlobBitVector, i::Int)::BlobBit
     @boundscheck begin
         (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
     end
