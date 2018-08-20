@@ -55,11 +55,7 @@ The number of bytes needed to allocate `T` itself.
 Defaults to `sizeof(T)`.
 """
 @generated function self_size(::Type{T}) where T
-    if VERSION >= v"0.7.0-DEV"
-        @assert isconcretetype(T)
-    else
-        @assert isleaftype(T)
-    end
+    @assert isconcretetype(T)
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
@@ -84,13 +80,8 @@ end
 end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
-    if VERSION >= v"0.7.0-DEV"
-        i = findfirst(isequal(field), fieldnames(T))
-        @assert i != nothing "$T has no field $field"
-    else
-        i = findfirst(fieldnames(T), field)
-        @assert i != 0 "$T has no field $field"
-    end
+    i = findfirst(isequal(field), fieldnames(T))
+    @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
         Blob{$(fieldtype(T, i))}(blob + blob_offset(T, $(Val{i})))

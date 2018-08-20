@@ -19,7 +19,7 @@ if Base.JLOptions().check_bounds == 0
     f1(blob)
 end
 
-foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
+foo = Blobs.malloc_and_init(Foo)
 @blob foo.x[] = 1
 @test (@blob foo.x[]) == 1
 @blob foo.y[] = 2.5
@@ -28,12 +28,6 @@ foo = Blobs.malloc_and_init(Foo) # display should work in 0.7 TODO fix for 0.6?
 # test interior pointers
 @test (@blob foo) == foo
 @test pointer(@blob foo.y) == pointer(foo) + sizeof(Int64)
-
-# test ambiguous syntax
-if VERSION < v"0.7.0-DEV"
-    @test_throws ErrorException eval(:(@blob foo.y[] == 2.5))
-    @test_throws ErrorException eval(:(@blob foo.y == 2.5))
-end
 
 # nested Blob
 
@@ -121,13 +115,8 @@ bs = @blob bbs[]
 @test bs == s
 @test repr(bs) == repr(s)
 @test collect(bs) == collect(s)
-if VERSION >= v"0.7.0-DEV"
-    @test findfirst(bs, "通") == findfirst(s, "通")
-    @test findlast(bs, "通") == findlast(s, "通")
-else
-    @test search(bs, "通") == search(s, "通")
-    @test rsearch(bs, "通") == rsearch(s, "通")
-end
+@test findfirst(bs, "通") == findfirst(s, "通")
+@test findlast(bs, "通") == findlast(s, "通")
 
 # test right-to-left
 s = "سلام"
@@ -137,13 +126,8 @@ bs = @blob bbs[]
 @test bs == s
 @test repr(bs) == repr(s)
 @test collect(bs) == collect(s)
-if VERSION >= v"0.7.0-DEV"
-    @test findfirst(bs, "ا") == findfirst(s, "ا")
-    @test findlast(bs, "ا") == findlast(s, "ا")
-else
-    @test search(bs, "ا") == search(s, "ا")
-    @test rsearch(bs, "ا") == rsearch(s, "ا")
-end
+@test findfirst(bs, "ا") == findfirst(s, "ا")
+@test findlast(bs, "ا") == findlast(s, "ا")
 
 # test string conversions
 
