@@ -3,11 +3,11 @@ struct BlobBit
     mask::UInt64
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::BlobBit)::Bool
+@inline Base.@propagate_inbounds function Base.getindex(blob::BlobBit)::Bool
     (blob.data[] & blob.mask) != 0
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::BlobBit, v::Bool)::Bool
+@inline Base.@propagate_inbounds function Base.setindex!(blob::BlobBit, v::Bool)::Bool
     c = blob.data[]
     c = ifelse(v, c | blob.mask, c & ~blob.mask)
     blob.data[] = c
@@ -38,7 +38,7 @@ function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
+@inline Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
     get_address(blob[], i)
 end
 
@@ -56,15 +56,15 @@ function Base.IndexStyle(_::Type{BlobBitVector})
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::BlobBitVector, i::Int)::Bool
+@inline Base.@propagate_inbounds function Base.getindex(blob::BlobBitVector, i::Int)::Bool
     get_address(blob, i)[]
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)::Bool
+@inline Base.@propagate_inbounds function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)::Bool
     get_address(blob, i)[] = v
 end
 
-function Base.findprevnot(blob::BlobBitVector, start::Int)::Int
+@inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Int
     start > 0 || return 0
     start > length(blob) && throw(BoundsError(blob, start))
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
@@ -74,7 +74,7 @@ function Base.findprevnot(blob::BlobBitVector, start::Int)::Int
     start
 end
 
-function Base.findnextnot(blob::BlobBitVector, start::Int)::Int
+@inline function Base.findnextnot(blob::BlobBitVector, start::Int)::Int
     start > 0 || throw(BoundsError(blob, start))
     start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
