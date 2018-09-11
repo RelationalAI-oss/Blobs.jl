@@ -2,12 +2,12 @@
 A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
-    base::Ptr{Void}
+    base::Ptr{Nothing}
     offset::Int64
     limit::Int64
 
-    function Blob{T}(base::Ptr{Void}, offset::Int64, limit::Int64) where {T}
-        @assert isbits(T)
+    function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
+        @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
@@ -55,11 +55,7 @@ The number of bytes needed to allocate `T` itself.
 Defaults to `sizeof(T)`.
 """
 @generated function self_size(::Type{T}) where T
-    if VERSION >= v"0.7.0-DEV"
-        @assert isconcretetype(T)
-    else
-        @assert isleaftype(T)
-    end
+    @assert isconcretetype(T)
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
@@ -84,13 +80,8 @@ end
 end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
-    if VERSION >= v"0.7.0-DEV"
-        i = findfirst(isequal(field), fieldnames(T))
-        @assert i != nothing "$T has no field $field"
-    else
-        i = findfirst(fieldnames(T), field)
-        @assert i != 0 "$T has no field $field"
-    end
+    i = findfirst(isequal(field), fieldnames(T))
+    @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
         Blob{$(fieldtype(T, i))}(blob + blob_offset(T, $(Val{i})))
@@ -139,6 +130,20 @@ end
             value
         end
     end
+end
+
+# syntax sugar
+
+function Base.propertynames(::Blob{T}, private=false) where T
+    fieldnames(T)
+end
+
+function Base.getproperty(blob::Blob{T}, field::Symbol) where T
+    getindex(blob, Val{field})
+end
+
+function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
+    setindex!(blob, Val{field}, value)
 end
 
 # patch pointers on the fly during load/store!
