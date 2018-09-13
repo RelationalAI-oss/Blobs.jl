@@ -7,27 +7,13 @@ struct Blob{T}
     limit::Int64
 
     function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
-        assert_permissible_type(T)
+        @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
 
 function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
-end
-
-function assert_permissible_type(::Type{T}) where T
-    @assert isbitstype(T) "Blobs requires isbits types: $T"
-    function visit_type_and_parameters(visitor::Function, ::Type{T}, state) where T
-        state = visitor(T, state)
-        for param in getproperty(T, :parameters)
-            visit_type_and_parameters(visitor, param, state)
-        end
-    end
-    visit_type_and_parameters(T, false) do X, state
-        @assert !state || !(X <: Blob) "Nesting of blobs under tuples is not supported: $T"
-        state || X <: Tuple
-    end
 end
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
