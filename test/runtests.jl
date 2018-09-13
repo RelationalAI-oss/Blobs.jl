@@ -238,4 +238,17 @@ quux = bar.e[]
 @test length(quux.x[]) == 15
 @test quux.y[] == 1.5
 
+# Tuples
+bt = Blobs.malloc_and_init(Tuple{Int64,Int64})
+bt[] = (2,3)
+@test bt[] == (2,3)
+@test bt[][1] == 2
+
+# Nesting of blobs inside tuples is not currently supported
+@test_throws AssertionError Blobs.malloc_and_init(Tuple{Blob{Int64}})
+@test_throws AssertionError Blobs.malloc_and_init(Tuple{Blob{Int64}})
+
+# Non-isbitstype types are not supported
+@test_throws ErrorException Blobs.malloc_and_init(String)
+
 end
