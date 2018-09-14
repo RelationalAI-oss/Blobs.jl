@@ -244,6 +244,16 @@ bt[] = (2,3)
 @test bt[] == (2,3)
 @test bt[][1] == 2
 
+# Structs inside tuples
+struct Toto{N}
+    data::NTuple{N, UInt8} # Immutable statically sized tuple
+    len::Int64 # in bytes
+end
+
+bt = Blobs.malloc_and_init(Tuple{Toto{1}})
+bt[] = (Toto{1}((0x0,), 8),)
+@test bt[][1].len == 8
+
 # Non-isbitstype types are not supported
 @test_throws ErrorException Blobs.malloc_and_init(String)
 

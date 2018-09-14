@@ -115,10 +115,18 @@ end
 end
 
 @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
-    if isempty(fieldnames(T)) || T <: Tuple
+    if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
             unsafe_store!(pointer(blob), value)
+            value
+        end
+    elseif T <: Tuple
+        quote
+            $(Expr(:meta, :inline))
+            $(@splice (i, field) in enumerate(fieldnames(T)) quote
+                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
+            end)
             value
         end
     else
