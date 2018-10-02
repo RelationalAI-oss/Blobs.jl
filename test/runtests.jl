@@ -86,6 +86,23 @@ bv[2] = true
 @test length(bv) == 3
 bv[1] = false
 bv[3] = false
+# test search methods
+@test findnext(bv, 1) == 2
+@test findnext(bv, 2) == 2
+@test findnext(bv, 3) == nothing
+@test Base.findnextnot(bv, 1) == 1
+@test Base.findnextnot(bv, 2) == 3
+@test Base.findnextnot(bv, 3) == 3
+bv[3] = true
+@test Base.findnextnot(bv, 3) == nothing
+bv[3] = false
+@test Base.findprevnot(bv, 1) == 1
+@test Base.findprevnot(bv, 2) == 1
+@test Base.findprevnot(bv, 3) == 3
+bv[1] = true
+@test Base.findprevnot(bv, 1) == nothing
+bv[1] = false
+
 # test iteration
 @test collect(bv) == [false, true, false]
 fill!(bv, false)

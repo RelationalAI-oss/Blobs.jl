@@ -64,32 +64,32 @@ end
     get_address(blob, i)[] = v
 end
 
-@inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Int
+@inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
     start > 0 || return 0
     start > length(blob) && throw(BoundsError(blob, start))
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start > 0 && blob[start]
         start -= 1
     end
-    start
+    start > 0 ? start : nothing
 end
 
-@inline function Base.findnextnot(blob::BlobBitVector, start::Int)::Int
+@inline function Base.findnextnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
     start > 0 || throw(BoundsError(blob, start))
     start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start <= length(blob) && blob[start]
         start += 1
     end
-    start
+    start <= length(blob) ? start : nothing
 end
 
-@inline function Base.findnext(blob::BlobBitVector, start::Int)::Int
+@inline function Base.findnext(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
     start > 0 || throw(BoundsError(blob, start))
     start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start <= length(blob) && !blob[start]
         start += 1
     end
-    start
+    start <= length(blob) ? start : nothing
 end
