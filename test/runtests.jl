@@ -90,12 +90,14 @@ bv[3] = false
 @test findnext(bv, 1) == 2
 @test findnext(bv, 2) == 2
 @test findnext(bv, 3) == nothing
+@test findnext(bv, 4) == nothing
 @test Base.findnextnot(bv, 1) == 1
 @test Base.findnextnot(bv, 2) == 3
 @test Base.findnextnot(bv, 3) == 3
 bv[3] = true
 @test Base.findnextnot(bv, 3) == nothing
 bv[3] = false
+@test Base.findprevnot(bv, 0) == nothing
 @test Base.findprevnot(bv, 1) == 1
 @test Base.findprevnot(bv, 2) == 1
 @test Base.findprevnot(bv, 3) == 3

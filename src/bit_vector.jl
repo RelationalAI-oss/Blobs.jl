@@ -65,7 +65,6 @@ end
 end
 
 @inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
-    start > 0 || return 0
     start > length(blob) && throw(BoundsError(blob, start))
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start > 0 && blob[start]
@@ -76,7 +75,6 @@ end
 
 @inline function Base.findnextnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
     start > 0 || throw(BoundsError(blob, start))
-    start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start <= length(blob) && blob[start]
         start += 1
@@ -86,7 +84,6 @@ end
 
 @inline function Base.findnext(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
     start > 0 || throw(BoundsError(blob, start))
-    start > length(blob) && return 0
     # TODO(tjgreen) placeholder slow implementation; should adapt optimized BitVector code
     @inbounds while start <= length(blob) && !blob[start]
         start += 1
