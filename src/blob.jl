@@ -77,16 +77,12 @@ function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
     end)
 end
 
-function getindex_expr(blob::Type{Blob{T}}, ::Type{Val{field}}) where {T, field}
+@generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
     @assert i != nothing "$T has no field $field"
-    :(Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, Val{i}))))
-end
-
-@generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     quote
         $(Expr(:meta, :inline))
-        $(getindex_expr(blob, Val{field}))
+        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, Val{i})))
     end
 end
 
@@ -110,7 +106,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load($(getindex_expr(blob, Val{field})))
+                unsafe_load(getindex(blob, $(Val{field})))
             end))
         end
     end
@@ -127,7 +123,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!($(getindex_expr(blob, Val{field})), value[$field])
+                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
             end)
             value
         end
@@ -135,7 +131,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!($(getindex_expr(blob, Val{field})), value.$field)
+                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
             end)
             value
         end
