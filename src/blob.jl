@@ -59,13 +59,13 @@ Defaults to `sizeof(T)`.
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
-            sizeof(T)
+            $(sizeof(T))
         end
     else
         quote
             $(Expr(:meta, :inline))
-            +(0, $(@splice i in 1:length(fieldnames(T)) quote
-                self_size(fieldtype(T, $i))
+            $(+(0, @splice i in 1:length(fieldnames(T)) begin
+                self_size(fieldtype(T, i))
             end))
         end
     end
