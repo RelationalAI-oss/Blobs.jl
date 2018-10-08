@@ -5,9 +5,9 @@ struct BlobVector{T} <: AbstractArray{T, 1}
 end
 
 Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
-    @boundscheck begin
-        (0 < i <= blob.length) || throw(BoundsError(blob, i))
-    end
+    # @boundscheck begin
+    #     (0 < i <= blob.length) || throw(BoundsError(blob, i))
+    # end
     blob.data + (i-1)*self_size(T)
 end
 
