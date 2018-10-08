@@ -73,8 +73,8 @@ end
 
 @generated function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
     quote
-        +(0, $(@splice j in 1:(i-1) quote
-            self_size(fieldtype(T, $j))
+        $(+(0, @splice j in 1:(i-1) begin
+            sizeof(fieldtype(T, j))
         end))
     end
 end
