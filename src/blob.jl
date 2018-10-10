@@ -7,7 +7,7 @@ struct Blob{T}
     limit::Int64
 
     function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
-        @assert isbitstype(T)
+        # @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
@@ -17,7 +17,7 @@ function Blob{T}(blob::Blob) where T
 end
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
-    @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
+    # @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
 function Base.pointer(blob::Blob{T}) where T
@@ -29,7 +29,7 @@ function Base.:+(blob::Blob{T}, offset::Integer) where T
 end
 
 function Base.:-(blob1::Blob, blob2::Blob)
-    assert_same_allocation(blob1, blob2)
+    # assert_same_allocation(blob1, blob2)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
@@ -164,7 +164,7 @@ end
 end
 
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
-    assert_same_allocation(blob, value)
+    # assert_same_allocation(blob, value)
     offset = getfield(value, :offset) - getfield(blob, :offset)
     unsafe_store!(Blob{Int64}(blob), offset)
 end

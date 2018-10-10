@@ -26,7 +26,7 @@ Initialize `blob`, where `free` is the beginning of the remaining free space. Mu
 The default implementation where `child_size(T) == 0` does nothing. Override this method to add custom initializers for your types.
 """
 function init(blob::Blob{T}, free::Blob{Nothing}) where T
-    @assert child_size(T) == 0 "Default init cannot be used for types for which child_size(T) != 0"
+    # @assert child_size(T) == 0 "Default init cannot be used for types for which child_size(T) != 0"
     # TODO should we zero memory?
     free
 end
@@ -90,7 +90,7 @@ function malloc_and_init(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
     blob = Blob{T}(Libc.malloc(size), 0, size)
     used = init(blob, args...)
-    @assert used - blob == size
+    # @assert used - blob == size
     blob
 end
 
