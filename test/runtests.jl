@@ -10,9 +10,9 @@ end
 
 # Blob
 
-blob = Blob{Int64}(Libc.malloc(16), 0, 8)
+blob = Blob{Int64}(Libc.malloc(16))
 @test_nowarn blob[]
-@test_throws BoundsError (blob+1)[]
+# @test_throws BoundsError (blob+1)[]
 if Base.JLOptions().check_bounds == 0
     # @inbounds only kicks in if compiled
     f1(blob) = @inbounds (blob+1)[]
@@ -40,10 +40,10 @@ foo.x[] = 1
 
 @test Blobs.self_size(BlobVector{Int64}) == 16
 
-data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
+data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4))
 bv = BlobVector{Int64}(data, 4)
 @test_nowarn bv[3]
-@test_throws BoundsError bv[4]
+# @test_throws BoundsError bv[4]
 if Base.JLOptions().check_bounds == 0
     f2(bv) = @inbounds bv[4]
     f2(bv)
@@ -69,10 +69,10 @@ bv[3] = Foo(3, 3.3)
 @test Blobs.child_size(BlobBitVector, 64*3) == 8*3
 @test Blobs.child_size(BlobBitVector, 64*3 + 1) == 8*4
 
-data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4), 0, sizeof(UInt64)*3)
+data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4))
 bv = BlobBitVector(data, 64*4)
 @test_nowarn bv[64*3]
-@test_throws BoundsError bv[64*3 + 1]
+# @test_throws BoundsError bv[64*3 + 1]
 if Base.JLOptions().check_bounds == 0
     f3(bv) = @inbounds bv[64*3 + 1]
     f3(bv)
@@ -120,10 +120,10 @@ bv2[] = true
 
 @test Blobs.self_size(BlobString) == 16
 
-data = Blob{UInt8}(Libc.malloc(8), 0, 8)
+data = Blob{UInt8}(Libc.malloc(8))
 @test_nowarn BlobString(data, 8)[8]
 # pretty much any access to a unicode string touches beginning and end
-@test_throws BoundsError BlobString(data, 16)[8]
+# @test_throws BoundsError BlobString(data, 16)[8]
 # @inbounds doesn't work for strings - too much work to propagate
 
 # test strings and unicode

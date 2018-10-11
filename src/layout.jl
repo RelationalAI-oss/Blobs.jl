@@ -88,7 +88,7 @@ Allocate and initialize a new `Blob{T}`.
 """
 @inline function malloc_and_init(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
-    blob = Blob{T}(Libc.malloc(size), 0, size)
+    blob = Blob{T}(Libc.malloc(size))
     used = init(blob, args...)
     # @assert used - blob == size
     blob

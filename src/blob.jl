@@ -2,40 +2,42 @@
 A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
-    base::Ptr{Nothing}
-    offset::Int64
-    limit::Int64
+    ptr::Ptr{Nothing}
 
-    @inline function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
+    @inline function Blob{T}(ptr::Ptr{Nothing}) where {T}
         # @assert isbitstype(T)
-        new(base, offset, limit)
+        new(ptr)
     end
 end
 
 @inline function Blob{T}(blob::Blob) where T
-    Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
+    Blob{T}(getfield(blob, :ptr))
 end
 
 @inline function assert_same_allocation(blob1::Blob, blob2::Blob)
-    # @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
+    # @assert getfield(blob1, :ptr) == getfield(blob2, :ptr) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
 @inline function Base.pointer(blob::Blob{T}) where T
-    convert(Ptr{T}, getfield(blob, :base) + getfield(blob, :offset))
+    convert(Ptr{T}, getfield(blob, :ptr))
+end
+
+@inline function Base.:+(blob::Blob{T}, offset::Blob) where T
+    Blob{T}(getfield(blob, :ptr) + getfield(offset, :ptr))
 end
 
 @inline function Base.:+(blob::Blob{T}, offset::Integer) where T
-    Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
+    Blob{T}(getfield(blob, :ptr) + offset)
 end
 
 @inline function Base.:-(blob1::Blob, blob2::Blob)
     # assert_same_allocation(blob1, blob2)
-    getfield(blob1, :offset) - getfield(blob2, :offset)
+    getfield(blob1, :ptr) - getfield(blob2, :ptr)
 end
 
 # @inline function boundscheck(blob::Blob{T}) where T
 #     @boundscheck begin
-#         if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
+#         if (getfield(blob, :offset) < 0)
 #             throw(BoundsError(blob))
 #         end
 #     end
@@ -220,12 +222,12 @@ end
 end
 
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
-    offset = unsafe_load(Blob{Int64}(blob))
-    Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
+    offset = unsafe_load(Blob{Int64}(blob.ptr))
+    Blob{T}(getfield(blob, :ptr) + offset)
 end
 
 @inline function Base.unsafe_store!(blob::Blob{Blob{T}}, value::Blob{T}) where {T}
     # assert_same_allocation(blob, value)
-    offset = getfield(value, :offset) - getfield(blob, :offset)
-    unsafe_store!(Blob{Int64}(blob), offset)
+    offset = getfield(value, :ptr) - getfield(blob, :ptr)
+    unsafe_store!(Blob{Int64}(getfield(blob, :ptr)), offset)
 end
