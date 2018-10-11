@@ -138,6 +138,11 @@ end
     end
 end
 
+# if the value is the wrong type, try to convert it (just like setting a field normally)
+@inline function Base.unsafe_store!(blob::Blob{T}, value) where {T}
+    unsafe_store!(blob, convert(T, value))
+end
+
 # syntax sugar
 
 @inline function Base.propertynames(::Blob{T}, private=false) where T
@@ -188,21 +193,21 @@ function rewrite_value(expr)
 end
 
 """
-    @v man.x[2].y
+    @v blob.x[2].y
 
-Get the *value* at `man.x[2].y`.
+Get the *value* at `blob.x[2].y`.
 
-    @v man.x[2].y = 42
+    @v blob.x[2].y = 42
 
-Set the *value* at `man.x[2].y`.
+Set the *value* at `blob.x[2].y`.
 
 NOTE macros bind tightly, so:
 
     # invalid syntax
-    @v man.x[2].y < 42
+    @v blob.x[2].y < 42
 
     # valid syntax
-    (@v man.x[2].y) < 42
+    (@v blob.x[2].y) < 42
 """
 macro v(expr)
     rewrite_value(expr)
