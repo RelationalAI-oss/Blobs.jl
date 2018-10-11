@@ -60,13 +60,11 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::BlobBitVector, i::Int)::Bool
-    addr = get_address(blob, i)
-    @v addr
+    get_address(blob, i)[]
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)::Bool
-    addr = get_address(blob, i)
-    @v addr = v
+    get_address(blob, i)[] = v
 end
 
 @inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
