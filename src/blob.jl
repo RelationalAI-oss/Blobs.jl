@@ -152,6 +152,62 @@ end
     setindex!(blob, Val{field}, value)
 end
 
+function rewrite_address(expr)
+    if !(expr isa Expr)
+        esc(expr)
+    elseif expr.head == :.
+        (object, field) = expr.args
+        if field isa QuoteNode
+            fieldname = field.value
+        elseif field isa Expr && field.head == :quote
+            fieldname = field.args[1]
+        else
+            error("Impossible?")
+        end
+        :(getindex($(rewrite_address(object)), $(Val{fieldname})))
+    elseif expr.head == :ref
+        object = expr.args[1]
+        :(getindex($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
+    elseif expr.head == :macrocall
+        rewrite_address(macroexpand(expr))
+    else
+        error("Don't know how to compute address for $expr")
+    end
+end
+
+function rewrite_value(expr)
+    if (expr isa Expr) && (expr.head == :(=))
+        if length(expr.args) == 2
+            :(unsafe_store!($(rewrite_address(expr.args[1])), $(esc(expr.args[2]))))
+        else
+            error("Don't know how to compute assignment $expr")
+        end
+    else
+        :(unsafe_load($(rewrite_address(expr))))
+    end
+end
+
+"""
+    @v man.x[2].y
+
+Get the *value* at `man.x[2].y`.
+
+    @v man.x[2].y = 42
+
+Set the *value* at `man.x[2].y`.
+
+NOTE macros bind tightly, so:
+
+    # invalid syntax
+    @v man.x[2].y < 42
+
+    # valid syntax
+    (@v man.x[2].y) < 42
+"""
+macro v(expr)
+    rewrite_value(expr)
+end
+
 # patch pointers on the fly during load/store!
 
 @inline function self_size(::Type{Blob{T}}) where T
