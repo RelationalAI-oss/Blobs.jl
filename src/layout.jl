@@ -35,31 +35,31 @@ end
 
 @inline function init(blob::Blob{Blob{T}}, free::Blob{Nothing}, args...) where T
     nested_blob = Blob{T}(free)
-    blob[] = nested_blob
+    @v blob = nested_blob
     init(nested_blob, free + self_size(T), args...)
 end
 
 @inline child_size(::Type{BlobVector{T}}, length::Int64) where {T} = self_size(T) * length
 
 @inline function init(blob::Blob{BlobVector{T}}, free::Blob{Nothing}, length::Int64) where T
-    blob.data[] = Blob{T}(free)
-    blob.length[] = length
+    @v blob.data = Blob{T}(free)
+    @v blob.length = length
     free + child_size(BlobVector{T}, length)
 end
 
 @inline child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / 64))
 
 @inline function init(blob::Blob{BlobBitVector}, free::Blob{Nothing}, length::Int64)
-    blob.data[] = Blob{UInt64}(free)
-    blob.length[] = length
+    @v blob.data = Blob{UInt64}(free)
+    @v blob.length = length
     free + child_size(BlobBitVector, length)
 end
 
 @inline child_size(::Type{BlobString}, length::Int64) = length
 
 @inline function init(blob::Blob{BlobString}, free::Blob{Nothing}, length::Int64)
-    blob.data[] = Blob{UInt8}(free)
-    blob.len[] = length
+    @v blob.data = Blob{UInt8}(free)
+    @v blob.len = length
     free + child_size(BlobString, length)
 end
 
@@ -67,7 +67,7 @@ end
 
 @inline function init(blob::Blob{BlobString}, free::Blob{Nothing}, string::Union{String, BlobString})
     free = init(blob, free, sizeof(string))
-    unsafe_copyto!(blob[], string)
+    unsafe_copyto!((@v blob), string)
     free
 end
 

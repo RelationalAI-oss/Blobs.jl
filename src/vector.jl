@@ -14,7 +14,7 @@ end
 # blob interface
 
 @inline function Base.size(blob::Blob{BlobVector})
-    (blob.length[],)
+    ((@v blob.length),)
 end
 
 @inline function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
@@ -22,7 +22,7 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
-    get_address(blob[], i)
+    get_address((@v blob), i)
 end
 
 # array interface
@@ -36,11 +36,13 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
-    get_address(blob, i)[]
+    addr = get_address(blob, i)
+    @v addr
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
-    get_address(blob, i)[] = v
+    addr = get_address(blob, i)
+    @v addr = v
 end
 
 # copying, with correct handling of overlapping regions

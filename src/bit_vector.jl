@@ -4,13 +4,15 @@ struct BlobBit
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::BlobBit)::Bool
-    (blob.data[] & blob.mask) != 0
+    blob_data = blob.data
+    ((@v blob_data) & blob.mask) != 0
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::BlobBit, v::Bool)::Bool
-    c = blob.data[]
+    blob_data = blob.data
+    c = @v blob_data
     c = ifelse(v, c | blob.mask, c & ~blob.mask)
-    blob.data[] = c
+    @v blob_data = c
     v
 end
 
@@ -31,7 +33,7 @@ end
 # blob interface
 
 @inline function Base.size(blob::Blob{BlobBitVector})
-    (blob.length[],)
+    ((@v blob.length),)
 end
 
 @inline function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
@@ -39,11 +41,12 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobBitVector}, i::Int)::BlobBit
-    get_address(blob[], i)
+    get_address((@v blob), i)
 end
 
 @inline function unsafe_resize!(blob::BlobBitVector, length::Int64)
-    blob.length[] = length
+    blob_len = blob.length
+    @v blob_len = length
 end
 
 # array interface
@@ -57,11 +60,13 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::BlobBitVector, i::Int)::Bool
-    get_address(blob, i)[]
+    addr = get_address(blob, i)
+    @v addr
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::BlobBitVector, v::Bool, i::Int)::Bool
-    get_address(blob, i)[] = v
+    addr = get_address(blob, i)
+    @v addr = v
 end
 
 @inline function Base.findprevnot(blob::BlobBitVector, start::Int)::Union{Nothing,Int}
