@@ -4,7 +4,7 @@ struct BlobVector{T} <: AbstractArray{T, 1}
     length::Int64
 end
 
-Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
+@inline Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
     # @boundscheck begin
     #     (0 < i <= blob.length) || throw(BoundsError(blob, i))
     # end
@@ -13,39 +13,39 @@ end
 
 # blob interface
 
-function Base.size(blob::Blob{BlobVector})
+@inline function Base.size(blob::Blob{BlobVector})
     (blob.length[],)
 end
 
-function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
+@inline function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+@inline Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
     get_address(blob[], i)
 end
 
 # array interface
 
-function Base.size(blob::BlobVector)
+@inline function Base.size(blob::BlobVector)
     (blob.length,)
 end
 
-function Base.IndexStyle(_::Type{BlobVector{T}}) where T
+@inline function Base.IndexStyle(_::Type{BlobVector{T}}) where T
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
+@inline Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
     get_address(blob, i)[]
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
+@inline Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
     get_address(blob, i)[] = v
 end
 
 # copying, with correct handling of overlapping regions
 # TODO use memcopy
-function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int) where T
+@inline function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int) where T
     if doff < soff
         for i in 0:n-1 dest[doff+i] = src[soff+i] end
     else
