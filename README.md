@@ -97,4 +97,71 @@ julia> foo.x[]
 42
 ```
 
-The various data-structures provided can be nested arbitrarily. See the [tests](https://github.com/RelationalAI-oss/Blobs.jl/) for examples.
+The various data-structures provided can be nested arbitrarily. See the [tests](https://github.com/RelationalAI-oss/Blobs.jl/blob/master/test/runtests.jl) for examples.
+
+
+## Compatibility with Previous Versions
+
+In the previous versions of this library, two macros `@v` and `@` were used and we keep them for compatibility reasons. This macros bypass some of the bound-checkings and safety measures that are in-place in the normal usage of `Blobs`. In this section, we will introduce their usage.
+
+Assume that we have the following `Foo` struct:
+
+``` julia
+julia> struct Foo
+       x::Int64
+       y::Bool
+       end
+
+julia> m = Blobs.malloc_and_init(Foo)
+Blob{Foo}(Ptr{Nothing} @0x00007fa0b84234e0, 0, 9)
+```
+
+Use the `@a` (for address) macro to obtain pointers to the fields of this struct:
+
+``` julia
+julia> @a m.x
+Blob{Int64}(Ptr{Nothing} @0x00007fa0b84234e0, 0, 9)
+
+julia> @a m.y
+Blob{Bool}(Ptr{Nothing} @0x00007fa0b84234e0, 8, 9)
+```
+
+Or the `@v` (for value) macro to dereference those pointers:
+
+``` julia
+julia> @v m.x
+44307392
+
+julia> @v m.y
+false
+
+julia> y = @a m.y
+Blob{Bool}(Ptr{Nothing} @0x00007fa0b84234e0, 8, 9)
+
+julia> @v y
+false
+```
+
+The `@v` macro also allows setting the value of a pointer:
+
+``` julia
+julia> @v m.y = true
+true
+
+julia> @v m.y
+true
+
+julia> x = @a m.x
+Blob{Int64}(Ptr{Nothing} @0x00007fa0b84234e0, 0, 9)
+
+julia> @v x = 42
+42
+
+julia> @v x
+42
+
+julia> @v m.x
+42
+```
+
+Also in this case, data-structures can be nested arbitrarily. See the [compat-tests](https://github.com/RelationalAI-oss/Blobs.jl/blob/master/test/compat-tests.jl) for examples.

@@ -138,6 +138,11 @@ end
     end
 end
 
+# if the value is the wrong type, try to convert it (just like setting a field normally)
+function Base.unsafe_store!(blob::Blob{T}, value) where {T}
+    unsafe_store!(blob, convert(T, value))
+end
+
 # syntax sugar
 
 function Base.propertynames(::Blob{T}, private=false) where T
@@ -150,6 +155,71 @@ end
 
 function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
     setindex!(blob, Val{field}, value)
+end
+
+function rewrite_address(expr)
+    if !(expr isa Expr)
+        esc(expr)
+    elseif expr.head == :.
+        (object, field) = expr.args
+        if field isa QuoteNode
+            fieldname = field.value
+        elseif field isa Expr && field.head == :quote
+            fieldname = field.args[1]
+        else
+            error("Impossible?")
+        end
+        :(getindex($(rewrite_address(object)), $(Val{fieldname})))
+    elseif expr.head == :ref
+        object = expr.args[1]
+        :(getindex($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
+    elseif expr.head == :macrocall
+        rewrite_address(macroexpand(expr))
+    else
+        error("Don't know how to compute address for $expr")
+    end
+end
+
+"""
+    @a blob.x[2].y
+
+Get a `Blob` pointing at the *address* of `blob.x[2].y`.
+"""
+macro a(expr)
+    rewrite_address(expr)
+end
+
+function rewrite_value(expr)
+    if (expr isa Expr) && (expr.head == :(=))
+        if length(expr.args) == 2
+            :(unsafe_store!($(rewrite_address(expr.args[1])), $(esc(expr.args[2]))))
+        else
+            error("Don't know how to compute assignment $expr")
+        end
+    else
+        :(unsafe_load($(rewrite_address(expr))))
+    end
+end
+
+"""
+    @v blob.x[2].y
+
+Get the *value* at `blob.x[2].y`.
+
+    @v blob.x[2].y = 42
+
+Set the *value* at `blob.x[2].y`.
+
+NOTE macros bind tightly, so:
+
+    # invalid syntax
+    @v blob.x[2].y < 42
+
+    # valid syntax
+    (@v blob.x[2].y) < 42
+"""
+macro v(expr)
+    rewrite_value(expr)
 end
 
 # patch pointers on the fly during load/store!
