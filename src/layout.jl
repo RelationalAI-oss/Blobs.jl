@@ -39,6 +39,8 @@ end
     init(nested_blob, free + self_size(T), args...)
 end
 
+@inline self_size(@nospecialize(s::Type{BlobVector{T}})) where T = sizeof(Int64) + sizeof(Int64)
+
 @inline child_size(::Type{BlobVector{T}}, length::Int64) where {T} = self_size(T) * length
 
 @inline function init(blob::Blob{BlobVector{T}}, free::Blob{Nothing}, length::Int64) where T
@@ -47,6 +49,8 @@ end
     free + child_size(BlobVector{T}, length)
 end
 
+@inline self_size(::Type{BlobBitVector}) = sizeof(Int64) + sizeof(UInt64)
+
 @inline child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / 64))
 
 @inline function init(blob::Blob{BlobBitVector}, free::Blob{Nothing}, length::Int64)
@@ -54,6 +58,8 @@ end
     @v blob.length = length
     free + child_size(BlobBitVector, length)
 end
+
+@inline self_size(::Type{BlobString}) = sizeof(Int64) + sizeof(Int64)
 
 @inline child_size(::Type{BlobString}, length::Int64) = length
 

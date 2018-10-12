@@ -54,23 +54,22 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-# @generated function self_size(::Type{T}) where T
-#     @assert isconcretetype(T)
-#     if isempty(fieldnames(T))
-#         quote
-#             $(Expr(:meta, :inline))
-#             $(sizeof(T))
-#         end
-#     else
-#         quote
-#             $(Expr(:meta, :inline))
-#             $(+(0, @splice i in 1:length(fieldnames(T)) begin
-#                 self_size(fieldtype(T, i))
-#             end))
-#         end
-#     end
-# end
-@inline self_size(::Type{T}) where T = sizeof(T)
+@generated function self_size(::Type{T}) where T
+    @assert isconcretetype(T)
+    if isempty(fieldnames(T))
+        quote
+            $(Expr(:meta, :inline))
+            $(sizeof(T))
+        end
+    else
+        quote
+            $(Expr(:meta, :inline))
+            $(+(0, @splice i in 1:length(fieldnames(T)) begin
+                self_size(fieldtype(T, i))
+            end))
+        end
+    end
+end
 
 @inline function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
@@ -83,7 +82,7 @@ end
     @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(getfield(blob, :ptr) + $(blob_offset(T, i)))
+        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
     end
 end
 
@@ -225,7 +224,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-@inline function self_size(::Type{Blob{T}}) where T
+@inline function self_size(@nospecialize(blob::Type{Blob{T}})) where T
     sizeof(Int64)
 end
 
