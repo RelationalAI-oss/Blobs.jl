@@ -182,6 +182,15 @@ function rewrite_address(expr)
     end
 end
 
+"""
+    @a blob.x[2].y
+
+Get a `Blob` pointing at the *address* of `blob.x[2].y`.
+"""
+macro a(expr)
+    rewrite_address(expr)
+end
+
 function rewrite_value(expr)
     if (expr isa Expr) && (expr.head == :(=))
         if length(expr.args) == 2
