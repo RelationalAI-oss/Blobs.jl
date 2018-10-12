@@ -49,33 +49,33 @@ end
 end
 
 # TODO(jamii) do we need to align data?
-# """
-#     sizeof(::Type{T}, args...) where {T}
-# 
-# The number of bytes needed to allocate `T` itself.
-# 
-# Defaults to `sizeof(T)`.
-# """
-# @generated function self_size(::Type{T}) where T
-#     @assert isconcretetype(T)
-#     if isempty(fieldnames(T))
-#         quote
-#             $(Expr(:meta, :inline))
-#             $(sizeof(T))
-#         end
-#     else
-#         quote
-#             $(Expr(:meta, :inline))
-#             $(+(0, @splice i in 1:length(fieldnames(T)) begin
-#                 self_size(fieldtype(T, i))
-#             end))
-#         end
-#     end
-# end
+"""
+    self_size(::Type{T}, args...) where {T}
+
+The number of bytes needed to allocate `T` itself.
+
+Defaults to `sizeof(T)`.
+"""
+@generated function self_size(::Type{T}) where T
+    @assert isconcretetype(T)
+    if isempty(fieldnames(T))
+        quote
+            $(Expr(:meta, :inline))
+            $(sizeof(T))
+        end
+    else
+        quote
+            $(Expr(:meta, :inline))
+            $(+(0, @splice i in 1:length(fieldnames(T)) begin
+                self_size(fieldtype(T, i))
+            end))
+        end
+    end
+end
 
 @inline function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
-        sizeof(fieldtype(T, j))
+        self_size(fieldtype(T, j))
     end)
 end
 
@@ -226,7 +226,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-@inline function sizeof(::Type{Blob{T}}) where T
+@inline function self_size(::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 

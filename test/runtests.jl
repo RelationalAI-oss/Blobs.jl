@@ -38,7 +38,7 @@ foo.x[] = 1
 
 # BlobVector
 
-@test Base.sizeof(BlobVector{Int64}) == 16
+@test Blobs.self_size(BlobVector{Int64}) == 16
 
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4))
 bv = BlobVector{Int64}(data, 4)
@@ -60,11 +60,11 @@ bv[3] = Foo(3, 3.3)
 # test iteration
 @test collect(bv) == [Foo(1,1.1), Foo(2,2.2), Foo(3,3.3)]
 # test interior pointers
-@test pointer(bbv[2]) - pointer(bv.data) == Base.sizeof(Foo)
+@test pointer(bbv[2]) - pointer(bv.data) == Blobs.self_size(Foo)
 
 # BlobBitVector
 
-@test Base.sizeof(BlobBitVector) == 16
+@test Blobs.self_size(BlobBitVector) == 16
 @test Blobs.child_size(BlobBitVector, 1) == 8*1
 @test Blobs.child_size(BlobBitVector, 64*3) == 8*3
 @test Blobs.child_size(BlobBitVector, 64*3 + 1) == 8*4
@@ -118,7 +118,7 @@ bv2[] = true
 
 # BlobString
 
-@test Base.sizeof(BlobString) == 16
+@test Blobs.self_size(BlobString) == 16
 
 data = Blob{UInt8}(Libc.malloc(8))
 @test_nowarn BlobString(data, 8)[8]
@@ -197,7 +197,7 @@ pma = Blobs.malloc_and_init(PackedMemoryArray{Int64, Float32}, 3)
 # tests fill!
 @test !any(pma.mask[])
 # tests pointer <-> offset conversion
-@test unsafe_load(convert(Ptr{Int64}, pointer(pma)), 1) == Base.sizeof(PackedMemoryArray{Int64, Float32})
+@test unsafe_load(convert(Ptr{Int64}, pointer(pma)), 1) == Blobs.self_size(PackedMemoryArray{Int64, Float32})
 # tests nested interior pointers
 pma2 = pma.mask[2]
 @test pma2[] == false
@@ -220,7 +220,7 @@ struct Bar
     e::Blob{Quux}
 end
 
-@test Base.sizeof(Bar) == 8 + 16 + 1 + 16 + 8 # Blob{Quux} is smaller in the blob
+@test Blobs.self_size(Bar) == 8 + 16 + 1 + 16 + 8 # Blob{Quux} is smaller in the blob
 
 function Blobs.child_size(::Type{Quux}, x_len::Int64, y::Float64)
     T = Quux
