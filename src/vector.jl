@@ -36,13 +36,11 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
-    addr = get_address(blob, i)
-    @v addr
+    unsafe_load(get_address(blob, i))
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
-    addr = get_address(blob, i)
-    @v addr = v
+    unsafe_store!(get_address(blob, i), v)
 end
 
 # copying, with correct handling of overlapping regions

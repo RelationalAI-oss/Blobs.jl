@@ -73,7 +73,7 @@ Defaults to `sizeof(T)`.
     end
 end
 
-@inline function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
+@inline function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
         self_size(fieldtype(T, j))
     end)
@@ -84,7 +84,7 @@ end
     @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(getfield(blob, :ptr) + $(blob_offset(T, Val{i})))
+        Blob{$(fieldtype(T, i))}(getfield(blob, :ptr) + $(blob_offset(T, i)))
     end
 end
 
