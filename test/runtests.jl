@@ -15,7 +15,7 @@ blob = Blob{Int64}(Libc.malloc(16))
 # @test_throws BoundsError (blob+1)[]
 if Base.JLOptions().check_bounds == 0
     # @inbounds only kicks in if compiled
-    f1(blob) = @inbounds (blob+1)[]
+    f1(blob) = @inbounds Blob{Int64}(blob+1)[]
     f1(blob)
 end
 
@@ -182,7 +182,7 @@ function Blobs.child_size(::Type{PackedMemoryArray{K,V}}, length::Int64) where {
       Blobs.child_size(fieldtype(T, :mask), length))
   end
 
-function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Blob{Nothing}, length::Int64) where {K,V}
+function Blobs.init(pma::Blob{PackedMemoryArray{K,V}}, free::Ptr{Nothing}, length::Int64) where {K,V}
     free = Blobs.init(pma.keys, free, length)
     free = Blobs.init(pma.values, free, length)
     free = Blobs.init(pma.mask, free, length)
@@ -234,13 +234,13 @@ function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_le
       Blobs.child_size(fieldtype(T, :e), x_len, y))
 end
 
-function Blobs.init(quux::Blob{Quux}, free::Blob{Nothing}, x_len::Int64, y::Float64)
+function Blobs.init(quux::Blob{Quux}, free::Ptr{Nothing}, x_len::Int64, y::Float64)
     free = Blobs.init(quux.x, free, x_len)
     quux.y[] = y
     free
 end
 
-function Blobs.init(bar::Blob{Bar}, free::Blob{Nothing}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+function Blobs.init(bar::Blob{Bar}, free::Ptr{Nothing}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
     free = Blobs.init(bar.b, free, b_len)
     free = Blobs.init(bar.d, free, d_len)
     free = Blobs.init(bar.e, free, x_len, y)

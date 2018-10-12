@@ -8,7 +8,7 @@ end
     # @boundscheck begin
     #     (0 < i <= blob.length) || throw(BoundsError(blob, i))
     # end
-    blob.data + (i-1)*self_size(T)
+    Blob{T}(blob.data + (i-1)*self_size(T))
 end
 
 # blob interface

@@ -27,7 +27,7 @@ end
     #     (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
     # end
     i1, i2 = Base.get_chunks_id(i)
-    BlobBit(blob.data + (i1-1)*self_size(UInt64), UInt64(1) << i2)
+    BlobBit(Blob{UInt64}(blob.data + (i1-1)*self_size(UInt64)), UInt64(1) << i2)
 end
 
 # blob interface
