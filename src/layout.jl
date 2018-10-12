@@ -1,7 +1,7 @@
 """
     child_size(::Type{T}, args...) where {T}
 
-The number of bytes needed to allocate children of `T`, not including `self_size(T)`.
+The number of bytes needed to allocate children of `T`, not including `sizeof(T)`.
 
 Defaults to 0.
 """
@@ -12,10 +12,10 @@ Defaults to 0.
 
 Initialize `blob`.
 
-Assumes that `blob` it at least `self_size(T) + child_size(T, args...)` bytes long.
+Assumes that `blob` it at least `sizeof(T) + child_size(T, args...)` bytes long.
 """
 @inline function init(blob::Blob{T}, args...) where T
-    init(blob, getfield(blob, :ptr) + self_size(T), args...)
+    init(blob, getfield(blob, :ptr) + sizeof(T), args...)
 end
 
 """
@@ -31,15 +31,15 @@ The default implementation where `child_size(T) == 0` does nothing. Override thi
     free
 end
 
-@inline child_size(::Type{Blob{T}}, args...) where T = self_size(T) + child_size(T, args...)
+@inline child_size(::Type{Blob{T}}, args...) where T = sizeof(T) + child_size(T, args...)
 
 @inline function init(blob::Blob{Blob{T}}, free::Ptr{Nothing}, args...) where T
     nested_blob = Blob{T}(free)
     @v blob = nested_blob
-    init(nested_blob, free + self_size(T), args...)
+    init(nested_blob, free + sizeof(T), args...)
 end
 
-@inline child_size(::Type{BlobVector{T}}, length::Int64) where {T} = self_size(T) * length
+@inline child_size(::Type{BlobVector{T}}, length::Int64) where {T} = sizeof(T) * length
 
 @inline function init(blob::Blob{BlobVector{T}}, free::Ptr{Nothing}, length::Int64) where T
     @v blob.data = Blob{T}(free)
@@ -47,7 +47,7 @@ end
     free + child_size(BlobVector{T}, length)
 end
 
-@inline child_size(::Type{BlobBitVector}, length::Int64) = self_size(UInt64) * Int64(ceil(length / 64))
+@inline child_size(::Type{BlobBitVector}, length::Int64) = sizeof(UInt64) * Int64(ceil(length / 64))
 
 @inline function init(blob::Blob{BlobBitVector}, free::Ptr{Nothing}, length::Int64)
     @v blob.data = Blob{UInt64}(free)
@@ -77,7 +77,7 @@ end
 Allocate an uninitialized `Blob{T}`.
 """
 @inline function malloc(::Type{T}, args...)::Blob{T} where T
-    size = self_size(T) + child_size(T, args...)
+    size = sizeof(T) + child_size(T, args...)
     Blob{T}(Libc.malloc(size))
 end
 
@@ -87,7 +87,7 @@ end
 Allocate and initialize a new `Blob{T}`.
 """
 @inline function malloc_and_init(::Type{T}, args...)::Blob{T} where T
-    size = self_size(T) + child_size(T, args...)
+    size = sizeof(T) + child_size(T, args...)
     blob = Blob{T}(Libc.malloc(size))
     used = init(blob, args...)
     # @assert used - blob == size
