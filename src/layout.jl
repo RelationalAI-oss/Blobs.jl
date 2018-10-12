@@ -39,7 +39,7 @@ end
     init(nested_blob, free + self_size(T), args...)
 end
 
-@inline self_size(@nospecialize(s::Type{BlobVector{T}})) where T = sizeof(Int64) + sizeof(Int64)
+@inline self_size(s::Type{BlobVector{T}}) where T = sizeof(Int64) + sizeof(Int64)
 
 @inline child_size(::Type{BlobVector{T}}, length::Int64) where {T} = self_size(T) * length
 

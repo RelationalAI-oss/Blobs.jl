@@ -224,7 +224,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-@inline function self_size(@nospecialize(blob::Type{Blob{T}})) where T
+@inline function self_size(blob::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 
