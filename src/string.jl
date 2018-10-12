@@ -28,7 +28,7 @@ Base.ncodeunits(s::BlobString) = sizeof(s)
 Base.codeunit(s::BlobString) = UInt8
 
 @inline function Base.codeunit(s::BlobString, i::Integer)
-    # @boundscheck checkbounds(s, i)
+    @boundscheck checkbounds(s, i)
     GC.@preserve s unsafe_load(pointer(s, i))
 end
 
@@ -130,11 +130,11 @@ Base.getindex(s::BlobString, r::UnitRange{<:Integer}) = s[Int(first(r)):Int(last
 function Base.getindex(s::BlobString, r::UnitRange{Int})
     isempty(r) && return ""
     i, j = first(r), last(r)
-    # @boundscheck begin
-    #     checkbounds(s, r)
-    #     @inbounds isvalid(s, i) || Base.string_index_err(s, i)
-    #     @inbounds isvalid(s, j) || Base.string_index_err(s, j)
-    # end
+    @boundscheck begin
+        checkbounds(s, r)
+        @inbounds isvalid(s, i) || Base.string_index_err(s, i)
+        @inbounds isvalid(s, j) || Base.string_index_err(s, j)
+    end
     j = nextind(s, j) - 1
     # n = j - i + 1
     # ss = _string_n(n)
@@ -147,10 +147,10 @@ function Base.getindex(s::BlobString, r::UnitRange{Int})
 end
 
 function Base.length(s::BlobString, i::Int, j::Int)
-    # @boundscheck begin
-    #     0 < i ≤ ncodeunits(s)+1 || throw(BoundsError(s, i))
-    #     0 ≤ j < ncodeunits(s)+1 || throw(BoundsError(s, j))
-    # end
+    @boundscheck begin
+        0 < i ≤ ncodeunits(s)+1 || throw(BoundsError(s, i))
+        0 ≤ j < ncodeunits(s)+1 || throw(BoundsError(s, j))
+    end
     j < i && return 0
     @inbounds i, k = thisind(s, i), i
     c = j - i + (i == k)
@@ -187,3 +187,4 @@ end
 ## overload methods for efficiency ##
 
 Base.isvalid(s::BlobString, i::Int) = checkbounds(Bool, s, i) && thisind(s, i) == i
+

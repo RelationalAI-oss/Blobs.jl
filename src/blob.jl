@@ -33,16 +33,16 @@ end
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-# @inline function boundscheck(blob::Blob{T}) where T
-#     @boundscheck begin
-#         if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
-#             throw(BoundsError(blob))
-#         end
-#     end
-# end
+@inline function boundscheck(blob::Blob{T}) where T
+    @boundscheck begin
+        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
+            throw(BoundsError(blob))
+        end
+    end
+end
 
 @inline Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
-    # boundscheck(blob)
+    boundscheck(blob)
     unsafe_load(blob)
 end
 
@@ -87,7 +87,7 @@ end
 end
 
 @inline Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
-    # boundscheck(blob)
+    boundscheck(blob)
     unsafe_store!(blob, value)
 end
 
