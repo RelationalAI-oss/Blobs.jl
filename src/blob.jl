@@ -226,7 +226,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-@inline function Base.sizeof(::Type{Blob{T}}) where T
+@inline function sizeof(::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 
