@@ -59,24 +59,22 @@ Defaults to `sizeof(T)`.
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
-            sizeof(T)
+            $(sizeof(T))
         end
     else
         quote
             $(Expr(:meta, :inline))
-            +(0, $(@splice i in 1:length(fieldnames(T)) quote
-                self_size(fieldtype(T, $i))
+            $(+(0, @splice i in 1:length(fieldnames(T)) begin
+                self_size(fieldtype(T, i))
             end))
         end
     end
 end
 
-@generated function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
-    quote
-        +(0, $(@splice j in 1:(i-1) quote
-            self_size(fieldtype(T, $j))
-        end))
-    end
+function blob_offset(::Type{T}, i::Int) where {T}
+    +(0, @splice j in 1:(i-1) begin
+        self_size(fieldtype(T, j))
+    end)
 end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
@@ -84,7 +82,7 @@ end
     @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + blob_offset(T, $(Val{i})))
+        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
     end
 end
 
