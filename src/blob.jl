@@ -7,7 +7,7 @@ struct Blob{T}
     limit::Int64
 
     @inline function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
-        # @assert isbitstype(T)
+        @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
@@ -17,7 +17,7 @@ end
 end
 
 @inline function assert_same_allocation(blob1::Blob, blob2::Blob)
-    # @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
+    @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
 @inline function Base.pointer(blob::Blob{T}) where T
