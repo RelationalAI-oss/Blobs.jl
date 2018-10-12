@@ -4,8 +4,8 @@ struct BlobString <: AbstractString
     len::Int64 # in bytes
 end
 
-Base.pointer(blob::BlobString) = pointer(blob, 1)
-function Base.pointer(blob::BlobString, i::Integer)
+@inline Base.pointer(blob::BlobString) = pointer(blob, 1)
+@inline function Base.pointer(blob::BlobString, i::Integer)
     # TODO(jamii) would prefer to boundscheck on load, but this will do for now
     getindex(blob.data + (blob.len - 1))
     pointer(blob.data + (i-1))
@@ -16,16 +16,16 @@ function Base.unsafe_copyto!(blob::BlobString, string::Union{BlobString, String}
     unsafe_copyto!(pointer(blob), pointer(string), sizeof(string))
 end
 
-function Base.String(blob::BlobString)
+@inline function Base.String(blob::BlobString)
     unsafe_string(pointer(blob), blob.len)
 end
 
 # string interface - this is largely copied from Base
 
-Base.sizeof(s::BlobString) = s.len
+@inline Base.sizeof(s::BlobString) = s.len
 
-Base.ncodeunits(s::BlobString) = sizeof(s)
-Base.codeunit(s::BlobString) = UInt8
+@inline Base.ncodeunits(s::BlobString) = sizeof(s)
+@inline Base.codeunit(s::BlobString) = UInt8
 
 @inline function Base.codeunit(s::BlobString, i::Integer)
     @boundscheck checkbounds(s, i)
@@ -187,4 +187,3 @@ end
 ## overload methods for efficiency ##
 
 Base.isvalid(s::BlobString, i::Int) = checkbounds(Bool, s, i) && thisind(s, i) == i
-

@@ -20,7 +20,7 @@ struct BlobBitVector <: AbstractArray{Bool, 1}
     length::Int64
 end
 
-Base.@propagate_inbounds function get_address(blob::BlobBitVector, i::Int)::BlobBit
+@inline Base.@propagate_inbounds function get_address(blob::BlobBitVector, i::Int)::BlobBit
     @boundscheck begin
         (i < 1 || i > blob.length) && throw(BoundsError(blob, i))
     end
@@ -30,11 +30,11 @@ end
 
 # blob interface
 
-function Base.size(blob::Blob{BlobBitVector})
+@inline function Base.size(blob::Blob{BlobBitVector})
     (blob.length[],)
 end
 
-function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
+@inline function Base.IndexStyle(_::Type{Blob{BlobBitVector}})
     Base.IndexLinear()
 end
 
@@ -42,17 +42,17 @@ end
     get_address(blob[], i)
 end
 
-function unsafe_resize!(blob::BlobBitVector, length::Int64)
+@inline function unsafe_resize!(blob::BlobBitVector, length::Int64)
     blob.length[] = length
 end
 
 # array interface
 
-function Base.size(blob::BlobBitVector)
+@inline function Base.size(blob::BlobBitVector)
     (blob.length,)
 end
 
-function Base.IndexStyle(_::Type{BlobBitVector})
+@inline function Base.IndexStyle(_::Type{BlobBitVector})
     Base.IndexLinear()
 end
 

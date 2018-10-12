@@ -6,29 +6,29 @@ struct Blob{T}
     offset::Int64
     limit::Int64
 
-    function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
+    @inline function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
         @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
 
-function Blob{T}(blob::Blob) where T
+@inline function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
-function assert_same_allocation(blob1::Blob, blob2::Blob)
+@inline function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
-function Base.pointer(blob::Blob{T}) where T
+@inline function Base.pointer(blob::Blob{T}) where T
     convert(Ptr{T}, getfield(blob, :base) + getfield(blob, :offset))
 end
 
-function Base.:+(blob::Blob{T}, offset::Integer) where T
+@inline function Base.:+(blob::Blob{T}, offset::Integer) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
 end
 
-function Base.:-(blob1::Blob, blob2::Blob)
+@inline function Base.:-(blob1::Blob, blob2::Blob)
     assert_same_allocation(blob1, blob2)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
@@ -41,7 +41,7 @@ end
     end
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
+@inline Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
     boundscheck(blob)
     unsafe_load(blob)
 end
@@ -71,7 +71,7 @@ Defaults to `sizeof(T)`.
     end
 end
 
-function blob_offset(::Type{T}, i::Int) where {T}
+@inline function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
         self_size(fieldtype(T, j))
     end)
@@ -86,13 +86,13 @@ end
     end
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
+@inline Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
     boundscheck(blob)
     unsafe_store!(blob, value)
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
+@inline Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
@@ -139,21 +139,21 @@ end
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-function Base.unsafe_store!(blob::Blob{T}, value) where {T}
+@inline function Base.unsafe_store!(blob::Blob{T}, value) where {T}
     unsafe_store!(blob, convert(T, value))
 end
 
 # syntax sugar
 
-function Base.propertynames(::Blob{T}, private=false) where T
+@inline function Base.propertynames(::Blob{T}, private=false) where T
     fieldnames(T)
 end
 
-function Base.getproperty(blob::Blob{T}, field::Symbol) where T
+@inline function Base.getproperty(blob::Blob{T}, field::Symbol) where T
     getindex(blob, Val{field})
 end
 
-function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
+@inline function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
     setindex!(blob, Val{field}, value)
 end
 
@@ -224,7 +224,7 @@ end
 
 # patch pointers on the fly during load/store!
 
-function self_size(::Type{Blob{T}}) where T
+@inline function self_size(::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 
