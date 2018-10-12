@@ -10,9 +10,9 @@ struct Blob{T}
     end
 end
 
-# @inline function Blob{T}(blob::Blob) where T
-#     Blob{T}(getfield(blob, :ptr))
-# end
+@inline function Blob{T}(blob::Blob) where T
+    Blob{T}(getfield(blob, :ptr))
+end
 
 @inline function assert_same_allocation(blob1::Blob, blob2::Blob)
     # @assert getfield(blob1, :ptr) == getfield(blob2, :ptr) "These blobs do not share the same allocation: $blob1 - $blob2"
@@ -23,11 +23,11 @@ end
 end
 
 @inline function Base.:+(blob::Blob{T}, offset::Blob) where T
-    getfield(blob, :ptr) + getfield(offset, :ptr)
+    Blob{T}(getfield(blob, :ptr) + getfield(offset, :ptr))
 end
 
 @inline function Base.:+(blob::Blob{T}, offset::Integer) where T
-    getfield(blob, :ptr) + offset
+    Blob{T}(getfield(blob, :ptr) + offset)
 end
 
 @inline function Base.:-(blob1::Blob, blob2::Blob)
@@ -147,17 +147,17 @@ end
 
 # syntax sugar
 
-# @inline function Base.propertynames(::Blob{T}, private=false) where T
-#     fieldnames(T)
-# end
-# 
-# @inline function Base.getproperty(blob::Blob{T}, field::Symbol) where T
-#     getindex(blob, Val{field})
-# end
-# 
-# @inline function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
-#     setindex!(blob, Val{field}, value)
-# end
+@inline function Base.propertynames(::Blob{T}, private=false) where T
+    fieldnames(T)
+end
+
+@inline function Base.getproperty(blob::Blob{T}, field::Symbol) where T
+    getindex(blob, Val{field})
+end
+
+@inline function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
+    setindex!(blob, Val{field}, value)
+end
 
 function rewrite_address(expr)
     if !(expr isa Expr)
@@ -231,7 +231,7 @@ end
 end
 
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
-    offset = unsafe_load(Blob{Int64}(getfield(blob, :ptr)))
+    offset = unsafe_load(Blob{Int64}(blob.ptr))
     Blob{T}(getfield(blob, :ptr) + offset)
 end
 

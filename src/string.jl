@@ -7,8 +7,8 @@ end
 Base.pointer(blob::BlobString) = pointer(blob, 1)
 function Base.pointer(blob::BlobString, i::Integer)
     # TODO(jamii) would prefer to boundscheck on load, but this will do for now
-    # getindex(blob.data + (blob.len - 1))
-    Ptr{UInt8}(blob.data + (i-1))
+    getindex(blob.data + (blob.len - 1))
+    pointer(blob.data + (i-1))
 end
 
 function Base.unsafe_copyto!(blob::BlobString, string::Union{BlobString, String})
@@ -143,7 +143,7 @@ function Base.getindex(s::BlobString, r::UnitRange{Int})
     #     unsafe_store!(p, codeunit(s, i + k - 1), k)
     # end
     # return ss
-    BlobString(Blob{UInt8}(s.data + (i-1)), j-i+1)
+    BlobString(s.data + (i-1), j-i+1)
 end
 
 function Base.length(s::BlobString, i::Int, j::Int)
