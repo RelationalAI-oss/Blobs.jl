@@ -6,29 +6,29 @@ struct Blob{T}
     offset::Int64
     limit::Int64
 
-    function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
+    @inline function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
         @assert isbitstype(T)
         new(base, offset, limit)
     end
 end
 
-function Blob{T}(blob::Blob) where T
+@inline function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
-function assert_same_allocation(blob1::Blob, blob2::Blob)
+@inline function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
 
-function Base.pointer(blob::Blob{T}) where T
+@inline function Base.pointer(blob::Blob{T}) where T
     convert(Ptr{T}, getfield(blob, :base) + getfield(blob, :offset))
 end
 
-function Base.:+(blob::Blob{T}, offset::Integer) where T
+@inline function Base.:+(blob::Blob{T}, offset::Integer) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
 end
 
-function Base.:-(blob1::Blob, blob2::Blob)
+@inline function Base.:-(blob1::Blob, blob2::Blob)
     assert_same_allocation(blob1, blob2)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
@@ -41,7 +41,7 @@ end
     end
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
+@inline Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
     boundscheck(blob)
     unsafe_load(blob)
 end
@@ -59,24 +59,22 @@ Defaults to `sizeof(T)`.
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
-            sizeof(T)
+            $(sizeof(T))
         end
     else
         quote
             $(Expr(:meta, :inline))
-            +(0, $(@splice i in 1:length(fieldnames(T)) quote
-                self_size(fieldtype(T, $i))
+            $(+(0, @splice i in 1:length(fieldnames(T)) begin
+                self_size(fieldtype(T, i))
             end))
         end
     end
 end
 
-@generated function blob_offset(::Type{T}, ::Type{Val{i}}) where {T, i}
-    quote
-        +(0, $(@splice j in 1:(i-1) quote
-            self_size(fieldtype(T, $j))
-        end))
-    end
+@inline function blob_offset(::Type{T}, i::Int) where {T}
+    +(0, @splice j in 1:(i-1) begin
+        self_size(fieldtype(T, j))
+    end)
 end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
@@ -84,17 +82,17 @@ end
     @assert i != nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + blob_offset(T, $(Val{i})))
+        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
     end
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
+@inline Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
     boundscheck(blob)
     unsafe_store!(blob, value)
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
-Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
+@inline Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
@@ -140,23 +138,93 @@ end
     end
 end
 
+# if the value is the wrong type, try to convert it (just like setting a field normally)
+@inline function Base.unsafe_store!(blob::Blob{T}, value) where {T}
+    unsafe_store!(blob, convert(T, value))
+end
+
 # syntax sugar
 
-function Base.propertynames(::Blob{T}, private=false) where T
+@inline function Base.propertynames(::Blob{T}, private=false) where T
     fieldnames(T)
 end
 
-function Base.getproperty(blob::Blob{T}, field::Symbol) where T
+@inline function Base.getproperty(blob::Blob{T}, field::Symbol) where T
     getindex(blob, Val{field})
 end
 
-function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
+@inline function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
     setindex!(blob, Val{field}, value)
+end
+
+function rewrite_address(expr)
+    if !(expr isa Expr)
+        esc(expr)
+    elseif expr.head == :.
+        (object, field) = expr.args
+        if field isa QuoteNode
+            fieldname = field.value
+        elseif field isa Expr && field.head == :quote
+            fieldname = field.args[1]
+        else
+            error("Impossible?")
+        end
+        :(getindex($(rewrite_address(object)), $(Val{fieldname})))
+    elseif expr.head == :ref
+        object = expr.args[1]
+        :(getindex($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
+    elseif expr.head == :macrocall
+        rewrite_address(macroexpand(expr))
+    else
+        error("Don't know how to compute address for $expr")
+    end
+end
+
+"""
+    @a blob.x[2].y
+
+Get a `Blob` pointing at the *address* of `blob.x[2].y`.
+"""
+macro a(expr)
+    rewrite_address(expr)
+end
+
+function rewrite_value(expr)
+    if (expr isa Expr) && (expr.head == :(=))
+        if length(expr.args) == 2
+            :(unsafe_store!($(rewrite_address(expr.args[1])), $(esc(expr.args[2]))))
+        else
+            error("Don't know how to compute assignment $expr")
+        end
+    else
+        :(unsafe_load($(rewrite_address(expr))))
+    end
+end
+
+"""
+    @v blob.x[2].y
+
+Get the *value* at `blob.x[2].y`.
+
+    @v blob.x[2].y = 42
+
+Set the *value* at `blob.x[2].y`.
+
+NOTE macros bind tightly, so:
+
+    # invalid syntax
+    @v blob.x[2].y < 42
+
+    # valid syntax
+    (@v blob.x[2].y) < 42
+"""
+macro v(expr)
+    rewrite_value(expr)
 end
 
 # patch pointers on the fly during load/store!
 
-function self_size(::Type{Blob{T}}) where T
+@inline function self_size(::Type{Blob{T}}) where T
     sizeof(Int64)
 end
 
