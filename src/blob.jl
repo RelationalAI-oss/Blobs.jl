@@ -54,22 +54,23 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-@generated function self_size(::Type{T}) where T
-    @assert isconcretetype(T)
-    if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            $(sizeof(T))
-        end
-    else
-        quote
-            $(Expr(:meta, :inline))
-            $(+(0, @splice i in 1:length(fieldnames(T)) begin
-                self_size(fieldtype(T, i))
-            end))
-        end
-    end
-end
+# @generated function self_size(::Type{T}) where T
+#     @assert isconcretetype(T)
+#     if isempty(fieldnames(T))
+#         quote
+#             $(Expr(:meta, :inline))
+#             $(sizeof(T))
+#         end
+#     else
+#         quote
+#             $(Expr(:meta, :inline))
+#             $(+(0, @splice i in 1:length(fieldnames(T)) begin
+#                 self_size(fieldtype(T, i))
+#             end))
+#         end
+#     end
+# end
+@inline self_size(::Type{T}) where T = sizeof(T)
 
 @inline function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
