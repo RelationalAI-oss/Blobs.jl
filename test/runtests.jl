@@ -41,7 +41,7 @@ foo.x[] = 1
 @test Blobs.self_size(BlobVector{Int64}) == 16
 
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
-bv = BlobVector{Int64}(data, 4)
+bv = BlobVector{Int64}(data, 3)
 @test_nowarn bv[3]
 @test_throws BoundsError bv[4]
 if Base.JLOptions().check_bounds == 0
@@ -70,7 +70,7 @@ bv[3] = Foo(3, 3.3)
 @test Blobs.child_size(BlobBitVector, 64*3 + 1) == 8*4
 
 data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4), 0, sizeof(UInt64)*3)
-bv = BlobBitVector(data, 64*4)
+bv = BlobBitVector(data, 64*3)
 @test_nowarn bv[64*3]
 @test_throws BoundsError bv[64*3 + 1]
 if Base.JLOptions().check_bounds == 0
