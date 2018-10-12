@@ -14,6 +14,6 @@ include("bit_vector.jl")
 include("string.jl")
 include("layout.jl")
 
-export Blob, BlobVector, BlobBitVector, BlobString, @v
+export Blob, BlobVector, BlobBitVector, BlobString, @v, @a
 
 end
