@@ -276,4 +276,6 @@ bt[] = (Toto{1}((0x0,), 8),)
 # Non-isbitstype types are not supported
 @test_throws ErrorException Blobs.malloc_and_init(String)
 
+include("compat-tests.jl")
+
 end
