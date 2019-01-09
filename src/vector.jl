@@ -52,3 +52,9 @@ function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::In
         for i in n-1:-1:0 dest[doff+i] = src[soff+i] end
     end
 end
+
+# iterate interface
+
+@inline function Base.iterate(blob::BlobVector, i=1)
+    (i % UInt) - 1 < length(blob) ? (@inbounds blob[i], i + 1) : nothing
+end
