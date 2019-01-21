@@ -4,7 +4,7 @@ struct BlobVector{T} <: AbstractArray{T, 1}
     length::Int64
 end
 
-Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
+function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))
     end
@@ -21,7 +21,7 @@ function Base.IndexStyle(_::Type{Blob{BlobVector{T}}}) where T
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
+function Base.getindex(blob::Blob{BlobVector{T}}, i::Int)::Blob{T} where T
     get_address(blob[], i)
 end
 
@@ -35,11 +35,11 @@ function Base.IndexStyle(_::Type{BlobVector{T}}) where T
     Base.IndexLinear()
 end
 
-Base.@propagate_inbounds function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
+function Base.getindex(blob::BlobVector{T}, i::Int)::T where T
     get_address(blob, i)[]
 end
 
-Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
+function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
     get_address(blob, i)[] = v
 end
 
@@ -55,6 +55,6 @@ end
 
 # iterate interface
 
-@inline function Base.iterate(blob::BlobVector, i=1)
+function Base.iterate(blob::BlobVector, i=1)
     (i % UInt) - 1 < length(blob) ? (@inbounds blob[i], i + 1) : nothing
 end
