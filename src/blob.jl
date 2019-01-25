@@ -46,7 +46,24 @@ Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
     unsafe_load(blob)
 end
 
-# TODO(jamii) do we need to align data?
+# Compute the size of a Blob{T}, by recursively summing the sizes of
+# its fields.  Note that the Blob size of T may be smaller
+# than the Julia layout of T, since we do not align fields (see note
+# at gen_unsafe_store!, below.)
+function compute_self_size(::Type{T})::Int where T
+    if isempty(T.types)
+        sizeof(T)
+    else
+        mapreduce(compute_self_size, +, T.types)
+    end
+end
+
+# TV: I don't understand this
+# patch pointers on the fly during load/store!
+function compute_self_size(::Type{Blob{T}})::Int where T
+    sizeof(Int64)
+end
+
 """
     self_size(::Type{T}, args...) where {T}
 
@@ -56,18 +73,9 @@ Defaults to `sizeof(T)`.
 """
 @generated function self_size(::Type{T}) where T
     @assert isconcretetype(T)
-    if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            $(sizeof(T))
-        end
-    else
-        quote
-            $(Expr(:meta, :inline))
-            $(+(0, @splice i in 1:length(fieldnames(T)) begin
-                self_size(fieldtype(T, i))
-            end))
-        end
+    quote
+        $(Expr(:meta, :inline))
+        $(compute_self_size(T))
     end
 end
 
@@ -96,45 +104,82 @@ Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
-@generated function Base.unsafe_load(blob::Blob{T}) where {T}
+# Generate code to retrieve the contents of a Blob{T} as an object of type T.
+# For Complex{Float64}, returns:
+# :(%new(Complex{Float64},
+#     unsafe_load(convert(Ptr{Float64}, blobptr + 0)),
+#     unsafe_load(convert(Ptr{Float64}, blobptr + 8))))
+# For Date, returns:
+# :(%new(Date,
+#     %new(Dates.UTInstant{Day},
+#         %new(Day, unsafe_load(convert(Ptr{Int64}, blobptr + 0))))))
+function gen_unsafe_load(layout_offset::Int, T::DataType)::Expr
     if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            unsafe_load(pointer(blob))
-        end
+        :(unsafe_load(convert(Ptr{$(T)}, blobptr + $(layout_offset))))
     else
-        quote
-            $(Expr(:meta, :inline))
-            $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load(getindex(blob, $(Val{field})))
-            end))
+        loads = []
+        pos = layout_offset
+        for fieldtype in T.types
+            push!(loads, gen_unsafe_load(pos, fieldtype))
+            pos += self_size(fieldtype)
         end
+        Expr(:new, T, loads...)
     end
 end
 
-@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
+@generated function Base.unsafe_load(blob::Blob{T}) where {T}
+    quote
+        $(Expr(:meta, :inline))
+        blobptr = getfield(blob, :base) + getfield(blob, :offset)
+        $(gen_unsafe_load(0, T))
+    end
+end
+
+# Generate code to write the contents an object of type T into a Blob{T}.
+# For Complex{Float64}, we generate:
+#    unsafe_store!(convert(Ptr{Float64}, blobptr + 0), value.re))
+#    unsafe_store!(convert(Ptr{Float64}, blobptr + 8), value.im))
+# Note that the blob layout is not the same as the layout of a Julia struct,
+# because of padding and alignment.  For example:
+#     struct Foo
+#         x::Int8
+#         y::Int64
+#     end
+# has sizeof(Foo)=16, but the blob has size 9.  This means that some fields
+# may be unaligned in the blob layout.  E.g. for x::Tuple{Int8,Float64,Int32}:
+#    unsafe_store!(convert(Ptr{Int8}, blobptr + 0), x[1])
+#    unsafe_store!(convert(Ptr{Float64}, blobptr + 1), x[2])
+#    unsafe_store!(convert(Ptr{Int16}, blobptr + 9), x[3])
+# This is intentional, so the blob representation is compact.
+function gen_unsafe_store!(code::Vector{Any}, layout_offset::Int, T::DataType, struct_path)
     if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            unsafe_store!(pointer(blob), value)
-            value
-        end
-    elseif T <: Tuple
-        quote
-            $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
-            end)
-            value
-        end
+        push!(code, :(unsafe_store!(convert(Ptr{$(T)}, blobptr + $(layout_offset)), $(struct_path))))
     else
-        quote
-            $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
-            end)
-            value
+        if T <: Tuple
+            # For x::Tuple{Int,Int}, we access fields as x[1], x[2]
+            get_struct_path = (struct_path, i, field) -> :($(struct_path)[$(i)])
+        else
+            # For x::Complex{T}, we access fields as x.re, x.im
+            get_struct_path = (struct_path, i, field) -> :($(struct_path).$(field))
         end
+        pos = layout_offset
+        for (i, field) in enumerate(fieldnames(T))
+            fieldtype = T.types[i]
+            gen_unsafe_store!(code, layout_offset+pos, fieldtype, get_struct_path(struct_path, i, field))
+            pos += self_size(fieldtype)
+        end
+    end
+    nothing
+end
+
+@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
+    code = []
+    gen_unsafe_store!(code, 0, T, :value)
+    quote
+        $(Expr(:meta, :inline))
+        blobptr = getfield(blob, :base) + getfield(blob, :offset)
+        $(code...)
+        value
     end
 end
 
@@ -220,12 +265,6 @@ NOTE macros bind tightly, so:
 """
 macro v(expr)
     rewrite_value(expr)
-end
-
-# patch pointers on the fly during load/store!
-
-function self_size(::Type{Blob{T}}) where T
-    sizeof(Int64)
 end
 
 @inline function Base.unsafe_load(blob::Blob{Blob{T}}) where {T}
