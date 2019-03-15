@@ -12,6 +12,14 @@ struct Blob{T}
     end
 end
 
+function Blob(ref::Base.RefValue{T}) where T
+    Blob{T}(pointer_from_objref(ref), 0, sizeof(T))
+end
+
+function Blob(base::Ptr{T}, offset::Int64 = 0, limit::Int64 = sizeof(T)) where {T}
+    Blob{T}(Ptr{Nothing}(base), offset, limit)
+end
+
 function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
