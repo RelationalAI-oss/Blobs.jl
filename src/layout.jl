@@ -82,6 +82,16 @@ function malloc(::Type{T}, args...)::Blob{T} where T
 end
 
 """
+    calloc(::Type{T}, args...)::Blob{T} where T
+
+Allocate a zero-initialized `Blob{T}`.
+"""
+function calloc(::Type{T}, args...)::Blob{T} where T
+    size = self_size(T) + child_size(T, args...)
+    Blob{T}(Libc.calloc(1, size), 0, size)
+end
+
+"""
     malloc_and_init(::Type{T}, args...)::Blob{T} where T
 
 Allocate and initialize a new `Blob{T}`.
