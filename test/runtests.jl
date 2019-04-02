@@ -29,6 +29,21 @@ foo.y[] = 2.5
 @test foo == foo
 @test pointer(foo.y) == pointer(foo) + sizeof(Int64)
 
+foo2_ref = Ref(Foo(42, 3.14))
+foo2 = Blob(foo2_ref)
+@test foo2[] == Foo(42, 3.14)
+
+foo3_arr = [Foo(1, -1), Foo(2, -2)]
+foo31 = Blob(pointer(foo3_arr), 0, 2sizeof(Foo))
+foo32 = Blob(pointer(foo3_arr), sizeof(Foo), 2sizeof(Foo))
+foo33 = Blob(pointer(foo3_arr, 2))
+@test foo31[] == Foo(1, -1)
+@test foo32[] == Foo(2, -2)
+@test foo33[] == Foo(2, -2)
+
+foo4 = Blobs.calloc(Foo)
+@test foo4[] == Foo(0, 0)
+
 # nested Blob
 
 bfoo = Blobs.malloc_and_init(Blob{Foo})
