@@ -45,8 +45,15 @@ end
 
 # copying, with correct handling of overlapping regions
 # TODO use memcopy
-function Base.copy!(dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int) where T
-    if doff < soff
+function Base.copy!(
+    dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int
+) where T
+    @boundscheck begin
+        if doff < 1 || doff + n - 1 > length(dest) || soff < 1 || soff + n - 1 > length(src)
+            throw(BoundsError([dest, src], [doff, soff, n]))
+        end
+    end
+    @inbounds if doff < soff
         for i in 0:n-1 dest[doff+i] = src[soff+i] end
     else
         for i in n-1:-1:0 dest[doff+i] = src[soff+i] end
