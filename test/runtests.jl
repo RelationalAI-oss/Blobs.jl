@@ -77,6 +77,20 @@ bv[3] = Foo(3, 3.3)
 # test interior pointers
 @test pointer(bbv[2]) - pointer(bv.data) == Blobs.self_size(Foo)
 
+bbv2 = Blobs.malloc_and_init(BlobVector{Foo}, 3)
+bv2 = bbv2[]
+
+copy!(bv2, 1, bv, 1, 3)
+@test bv == bv2
+
+copy!(bv2, 2, bv, 1, 2)
+@test bv[1:2] == bv2[2:3]
+
+@test_throws BoundsError copy!(bv2, 0, bv, 1, 3)
+@test_throws BoundsError copy!(bv2, 1, bv, 1, 4)
+@test_throws BoundsError copy!(bv2, 1, bv, 0, 3)
+@test_throws BoundsError copy!(bv2, 0, bv, 0, 4)
+
 # BlobBitVector
 
 @test Blobs.self_size(BlobBitVector) == 16
