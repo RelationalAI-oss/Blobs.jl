@@ -91,6 +91,19 @@ copy!(bv2, 2, bv, 1, 2)
 @test_throws BoundsError copy!(bv2, 1, bv, 0, 3)
 @test_throws BoundsError copy!(bv2, 0, bv, 0, 4)
 
+# Copy to self
+bv3 = Blobs.malloc_and_init(BlobVector{Int}, 5)[]
+for i in 1:5
+    bv3[i] = i
+end
+
+copy!(bv3, 4, bv3, 1, 2)
+@test bv3 == [1,2,3,1,2]
+copy!(bv3, 2, bv3, 1, 4)
+@test bv3 == [1,1,2,3,1]
+
+@test_throws BoundsError copy!(bv3, 2, bv3, 1, 5)
+
 # BlobBitVector
 
 @test Blobs.self_size(BlobBitVector) == 16
