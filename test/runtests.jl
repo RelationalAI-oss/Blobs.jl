@@ -101,6 +101,8 @@ copy!(bv3, 4, bv3, 1, 2)
 @test bv3 == [1,2,3,1,2]
 copy!(bv3, 2, bv3, 1, 4)
 @test bv3 == [1,1,2,3,1]
+copy!(bv3, 1, bv3, 2, 4)
+@test bv3 == [1,2,3,1,1]
 
 @test_throws BoundsError copy!(bv3, 2, bv3, 1, 5)
 
