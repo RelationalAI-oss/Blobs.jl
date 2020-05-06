@@ -46,6 +46,7 @@ end
         if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
             throw(BoundsError(blob))
         end
+        @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
     end
 end
 
