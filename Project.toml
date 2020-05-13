@@ -1,6 +1,6 @@
 name = "Blobs"
-uuid = "2063b8be-a4ad-11e8-1fb9-93d01944c8ed"
-authors = ["Jamie Brandon <jamie@scattered-thoughts.net>"]
+uuid = "163b9779-6631-5f90-a265-3de947924de8"
+authors = []
 version = "0.4.0"
 
 [deps]
