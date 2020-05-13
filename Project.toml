@@ -1,7 +1,7 @@
 name = "Blobs"
 uuid = "2063b8be-a4ad-11e8-1fb9-93d01944c8ed"
 authors = ["Jamie Brandon <jamie@scattered-thoughts.net>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
