@@ -1,18 +1,30 @@
-"A string whose data is stored in a Blob."
-struct BlobString <: AbstractString
+"""
+    Blobs.malloc_and_init(BlobString{N}, str)
+
+A string of fixed capacity, N, whose data is stored in a Blob.
+"""
+struct BlobString{N} <: AbstractString
+    # TODO(NCG): We probably long-term want to remove the base pointer from these, and
+    # simply require you to pass-in the parent pointer to any accessors.
     data::Blob{UInt8}
-    len::Int64 # in bytes
+    len::Int64 # (runtime length) in bytes
 end
 
 Base.pointer(blob::BlobString) = pointer(blob, 1)
+
 function Base.pointer(blob::BlobString, i::Integer)
+    # TODO(NHD,NCG): This seems like a bug, i don't think it's even doing the right
+    # boundscheck?
     # TODO(jamii) would prefer to boundscheck on load, but this will do for now
     getindex(blob.data + (blob.len - 1))
     pointer(blob.data + (i-1))
 end
 
-function Base.unsafe_copyto!(blob::BlobString, string::Union{BlobString, String})
-    @assert blob.len >= sizeof(string)
+function Base.unsafe_copyto!(
+    blob::BlobString{N},
+    string::Union{BlobString, String}
+) where {N}
+    @assert N >= sizeof(string)
     unsafe_copyto!(pointer(blob), pointer(string), sizeof(string))
 end
 
@@ -127,7 +139,9 @@ end
 
 Base.getindex(s::BlobString, r::UnitRange{<:Integer}) = s[Int(first(r)):Int(last(r))]
 
-function Base.getindex(s::BlobString, r::UnitRange{Int})
+# TODO: We currently return a new String of capacity N. Do we ever want to support
+# specifying the output capacity?
+function Base.getindex(s::BS, r::UnitRange{Int}) where {N, BS<:BlobString{N}}
     isempty(r) && return ""
     i, j = first(r), last(r)
     @boundscheck begin
@@ -143,7 +157,7 @@ function Base.getindex(s::BlobString, r::UnitRange{Int})
     #     unsafe_store!(p, codeunit(s, i + k - 1), k)
     # end
     # return ss
-    BlobString(s.data + (i-1), j-i+1)
+    BS(s.data + (i-1), j-i+1)
 end
 
 function Base.length(s::BlobString, i::Int, j::Int)
@@ -187,4 +201,3 @@ end
 ## overload methods for efficiency ##
 
 Base.isvalid(s::BlobString, i::Int) = checkbounds(Bool, s, i) && thisind(s, i) == i
-

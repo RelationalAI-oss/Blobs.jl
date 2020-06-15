@@ -55,17 +55,23 @@ function init(blob::Blob{BlobBitVector}, free::Blob{Nothing}, length::Int64)
     free + child_size(BlobBitVector, length)
 end
 
-child_size(::Type{BlobString}, length::Int64) = length
+# TODO(NHD,NCG): Move these type-specific intializers into their respective files
 
-function init(blob::Blob{BlobString}, free::Blob{Nothing}, length::Int64)
+child_size(::Type{BlobString{N}}) where {N} = N
+child_size(::Type{BlobString{N}}, _) where {N} = N
+
+function init(blob::Blob{BS}, free::Blob{Nothing}, length::Int64) where {N, BS<:BlobString{N}}
     blob.data[] = Blob{UInt8}(free)
     blob.len[] = length
-    free + child_size(BlobString, length)
+    free + child_size(BS)
 end
 
-child_size(::Type{BlobString}, string::Union{String, BlobString}) = sizeof(string)
-
-function init(blob::Blob{BlobString}, free::Blob{Nothing}, string::Union{String, BlobString})
+function init(
+    blob::Blob{BlobString{N}},
+    free::Blob{Nothing},
+    string::Union{String, BlobString}
+) where {N}
+    @assert sizeof(string) <= N
     free = init(blob, free, sizeof(string))
     unsafe_copyto!(blob[], string)
     free

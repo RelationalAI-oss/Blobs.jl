@@ -50,37 +50,44 @@ fill!(pbv, false)
 
 # strings and unicode
 
-s = "普通话/普通話"
-mp = Blobs.malloc_and_init(BlobString, s)
-p = @v mp
-@test p == s
-@test repr(p) == repr(s)
-@test collect(p) == collect(s)
-@test findfirst(p, "通") == findfirst(s, "通")
+# Use fewer tests, to save time
+@testset "BS{$N}" for N in (64, 128)
 
-# test right-to-left
+    BS = BlobString{N}
 
-s = "سلام"
-mp = Blobs.malloc_and_init(BlobString, s)
-p = @v mp
-@test p == s
-@test repr(p) == repr(s)
-@test collect(p) == collect(s)
-@test findfirst(p, "ا") == findfirst(s, "ا")
+    s = "普通话/普通話"
+    mp = Blobs.malloc_and_init(BS, s)
+    p = @v mp
+    @test p == s
+    @test repr(p) == repr(s)
+    @test collect(p) == collect(s)
+    @test findfirst(p, "通") == findfirst(s, "通")
 
-# test string conversions
+    # test right-to-left
 
-@test isbits(p)
-@test String(p) isa String
-@test String(p) == s
+    s = "سلام"
+    mp = Blobs.malloc_and_init(BS, s)
+    p = @v mp
+    @test p == s
+    @test repr(p) == repr(s)
+    @test collect(p) == collect(s)
+    @test findfirst(p, "ا") == findfirst(s, "ا")
 
-# test string slices
+    # test string conversions
 
-s = "aye bee sea"
-mp = Blobs.malloc_and_init(BlobString, s)
-p = @v mp
-@test p[5:7] isa BlobString
-@test p[5:7] == "bee"
+    @test isbits(p)
+    @test String(p) isa String
+    @test String(p) == s
+
+    # test string slices
+
+    s = "aye bee sea"
+    mp = Blobs.malloc_and_init(BS, s)
+    p = @v mp
+    @test p[5:7] isa BS
+    @test p[5:7] == "bee"
+
+end
 
 # sketch of paged pmas
 
