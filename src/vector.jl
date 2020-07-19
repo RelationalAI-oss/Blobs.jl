@@ -56,14 +56,14 @@ function Base.copy!(
     end
     # Use memmove for speedy copying. Note: this correctly handles overlapping regions.
     blob_size = Blobs.self_size(T)
-ccall(
-    :memmove,
-    Ptr{Cvoid},
-    (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t),
-    Base.pointer(dest.data) + (doff - 1) * blob_size,
-    Base.pointer(src.data) + (soff - 1) * blob_size,
-    n * blob_size,
-)
+    ccall(
+        :memmove,
+        Ptr{Cvoid},
+        (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t),
+        Base.pointer(dest.data) + (doff - 1) * blob_size,
+        Base.pointer(src.data) + (soff - 1) * blob_size,
+        n * blob_size,
+    )
 end
 
 # iterate interface
