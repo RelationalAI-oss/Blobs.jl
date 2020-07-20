@@ -44,7 +44,6 @@ Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)
 end
 
 # copying, with correct handling of overlapping regions
-# TODO use memcopy
 function Base.copy!(
     dest::BlobVector{T}, doff::Int, src::BlobVector{T}, soff::Int, n::Int
 ) where T
@@ -55,11 +54,16 @@ function Base.copy!(
             throw(BoundsError(src, soff:soff+n-1))
         end
     end
-    if doff < soff
-        @inbounds for i in 0:n-1 dest[doff+i] = src[soff+i] end
-    else
-        @inbounds for i in n-1:-1:0 dest[doff+i] = src[soff+i] end
-    end
+    # Use memmove for speedy copying. Note: this correctly handles overlapping regions.
+    blob_size = Blobs.self_size(T)
+    ccall(
+        :memmove,
+        Ptr{Cvoid},
+        (Ptr{Cvoid}, Ptr{Cvoid}, Csize_t),
+        Base.pointer(dest.data) + (doff - 1) * blob_size,
+        Base.pointer(src.data) + (soff - 1) * blob_size,
+        n * blob_size,
+    )
 end
 
 # iterate interface
