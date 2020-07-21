@@ -1,7 +1,7 @@
 name = "Blobs"
 uuid = "163b9779-6631-5f90-a265-3de947924de8"
 authors = []
-version = "0.4.0"
+version = "0.5.0"
 
 [deps]
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
