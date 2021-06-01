@@ -154,7 +154,7 @@ end
 
 # syntax sugar
 
-function Base.propertynames(::Blob{T}, private=false) where T
+function Base.propertynames(::Blob{T}, private::Bool=false) where T
     fieldnames(T)
 end
 
