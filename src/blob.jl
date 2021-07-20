@@ -95,6 +95,13 @@ end
     end
 end
 
+@inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
+    @boundscheck if i < 1 || i > fieldcount(T)
+        throw(BoundsError(blob, i))
+    end
+    return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
+end
+
 Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
     boundscheck(blob)
     unsafe_store!(blob, value)
