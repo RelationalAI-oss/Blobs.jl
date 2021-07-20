@@ -4,6 +4,10 @@ struct BlobVector{T} <: AbstractArray{T, 1}
     length::Int64
 end
 
+function Base.pointer(bv::BlobVector{T}, i::Integer=1) where {T}
+    return get_address(bv, i)
+end
+
 Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
     @boundscheck begin
         (0 < i <= blob.length) || throw(BoundsError(blob, i))

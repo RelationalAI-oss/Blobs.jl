@@ -91,6 +91,11 @@ copy!(bv2, 2, bv, 1, 2)
 @test_throws BoundsError copy!(bv2, 1, bv, 0, 3)
 @test_throws BoundsError copy!(bv2, 0, bv, 0, 4)
 
+@test pointer(bv) == pointer(bv, 1)
+for i in 1:length(bv)
+    @test unsafe_load(pointer(bv, i)) == bv[i]
+end
+
 # Copy to self
 bv3 = Blobs.malloc_and_init(BlobVector{Int}, 5)[]
 for i in 1:5
@@ -306,6 +311,12 @@ bt = Blobs.malloc_and_init(Tuple{Int64,Int64})
 bt[] = (2,3)
 @test bt[] == (2,3)
 @test bt[][1] == 2
+
+@test bt[1][] == 2
+@test bt[2][] == 3
+bt[2][] = 42
+@test bt[2][] == 42
+@test bt[][2] == 42
 
 # Structs inside tuples
 struct Toto{N}
