@@ -86,9 +86,9 @@ function blob_offset(::Type{T}, i::Int) where {T}
     end)
 end
 
-@generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
+@generated function _getfield(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
-    @assert i != nothing "$T has no field $field"
+    @assert i !== nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
         Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
@@ -122,7 +122,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load(getindex(blob, $(Val{field})))
+                unsafe_load(_getfield(blob, $(Val{field})))
             end))
         end
     end
@@ -139,7 +139,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
+                unsafe_store!(_getfield(blob, $(Val{field})), value[$field])
             end)
             value
         end
@@ -147,7 +147,7 @@ end
         quote
             $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
+                unsafe_store!(_getfield(blob, $(Val{field})), value.$field)
             end)
             value
         end
@@ -166,11 +166,11 @@ function Base.propertynames(::Blob{T}, private::Bool=false) where T
 end
 
 function Base.getproperty(blob::Blob{T}, field::Symbol) where T
-    getindex(blob, Val{field})
+    _getfield(blob, Val{field})
 end
 
 function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
-    setindex!(blob, Val{field}, value)
+    unsafe_store!(Blobs._getfield(blob, Val{:x}), 1)
 end
 
 function rewrite_address(expr)
@@ -185,7 +185,7 @@ function rewrite_address(expr)
         else
             error("Impossible?")
         end
-        :(getindex($(rewrite_address(object)), $(Val{fieldname})))
+        :(_getfield($(rewrite_address(object)), $(Val{fieldname})))
     elseif expr.head == :ref
         object = expr.args[1]
         :(getindex($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
