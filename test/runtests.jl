@@ -203,9 +203,6 @@ bs = bbs[]
 @test String(bs) isa String
 @test String(bs) == s
 
-println(s)
-println("Testing: $s")
-
 # test string slices
 
 s = "aye bee sea"
