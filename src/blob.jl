@@ -86,13 +86,13 @@ function blob_offset(::Type{T}, i::Int) where {T}
     end)
 end
 
-@generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
+# TODO: I really wish there was a way to assert that this would actually
+# get done at compile time, so we can feel confident removing the at-generated.
+# I've attempted to do this via `@inferred` tests, but that's not fully sufficient.
+@inline function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
-    @assert i != nothing "$T has no field $field"
-    quote
-        $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
-    end
+    @assert i !== nothing "$T has no field $field"
+    Blob{fieldtype(T, i)}(blob + (blob_offset(T, i)))
 end
 
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
