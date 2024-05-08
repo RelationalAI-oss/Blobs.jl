@@ -80,6 +80,32 @@ Defaults to `sizeof(T)`.
     end
 end
 
+# TODO: Sad, none of these below attempts will constant-fold.
+# function self_size(::Type{T}) where T
+#     # @assert isconcretetype(T)
+#     if isempty(fieldnames(T))
+#         sizeof(T)
+#     else
+#         sizes = NTuple{fieldcount(T), Int}(self_size(typ) for typ in fieldtypes(T))
+#         # sizes = self_size.(fieldtypes(T))
+#         sum(sizes)
+#         # _sum_field_sizes(T)
+#     end
+# end
+# @inline _sum_field_sizes(::Type{T}) where {T} = _sum_field_sizes(T, Val(fieldcount(T)))
+# @inline _sum_field_sizes(::Type, ::Val{0}) = 0
+# @inline function _sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
+#     return self_size(fieldtype(T, i)) + _sum_field_sizes(T, Val(i-1))
+# end
+# @inline function _sum_field_sizes(::Type{T}) where {T}
+#     out = 0
+#     for i in 1:length(fieldnames(T))
+#         out += self_size(fieldtype(T, i))
+#     end
+#     return out
+# end
+
+
 function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
         self_size(fieldtype(T, j))
@@ -127,6 +153,15 @@ end
         end
     end
 end
+# TODO: This generates >2x llvm instructions, even though it _is_ type stable...
+# Need to see if there's something better we can do here.
+# @inline function Base.unsafe_load(blob::Blob{T}) where {T}
+#     if isempty(fieldnames(T))
+#         unsafe_load(pointer(blob))
+#     else
+#         T((unsafe_load(getindex(blob, Val{field})) for field in fieldnames(T))...)
+#     end
+# end
 
 @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
