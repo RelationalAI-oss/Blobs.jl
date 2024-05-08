@@ -1,3 +1,5 @@
+@testitem "compat-tests" begin
+
 module TestBlobsCompat
 
 using Blobs
@@ -173,3 +175,5 @@ quux = @v bar.e
 @test (@v quux.y) == 1.5
 
 end
+
+end  # testitem
