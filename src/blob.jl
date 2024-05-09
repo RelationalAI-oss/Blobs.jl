@@ -63,48 +63,26 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-@generated function self_size(::Type{T}) where T
-    @assert isconcretetype(T)
+Base.@assume_effects :foldable function self_size(::Type{T}) where T
+    # This function is marked :total to encourage constant folding for this types-only
+    # static computation.
     if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            $(sizeof(T))
-        end
+        sizeof(T)
     else
-        quote
-            $(Expr(:meta, :inline))
-            $(+(0, @splice i in 1:length(fieldnames(T)) begin
-                self_size(fieldtype(T, i))
-            end))
-        end
+        # Recursion is the fastest way to compile this, confirmed with benchmarks.
+        # Alternative considered: +(Iterators.map(self_size, fieldtypes(T))...)
+        # ~0.5ms for 5 fields, vs ~5ms for unrolling via splatting the fields.
+        # ~3ms for 20 fields, vs ~6ms for splatting.
+        # Note that splatting gives up after ~30 fields, whereas recursion remains robust.
+        _sum_field_sizes(T)
     end
 end
-
-# TODO: Sad, none of these below attempts will constant-fold.
-# function self_size(::Type{T}) where T
-#     # @assert isconcretetype(T)
-#     if isempty(fieldnames(T))
-#         sizeof(T)
-#     else
-#         sizes = NTuple{fieldcount(T), Int}(self_size(typ) for typ in fieldtypes(T))
-#         # sizes = self_size.(fieldtypes(T))
-#         sum(sizes)
-#         # _sum_field_sizes(T)
-#     end
-# end
-# @inline _sum_field_sizes(::Type{T}) where {T} = _sum_field_sizes(T, Val(fieldcount(T)))
-# @inline _sum_field_sizes(::Type, ::Val{0}) = 0
-# @inline function _sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
-#     return self_size(fieldtype(T, i)) + _sum_field_sizes(T, Val(i-1))
-# end
-# @inline function _sum_field_sizes(::Type{T}) where {T}
-#     out = 0
-#     for i in 1:length(fieldnames(T))
-#         out += self_size(fieldtype(T, i))
-#     end
-#     return out
-# end
-
+Base.@assume_effects :foldable _sum_field_sizes(::Type{T}) where {T} =
+    _sum_field_sizes(T, Val(fieldcount(T)))
+Base.@assume_effects :foldable _sum_field_sizes(::Type, ::Val{0}) = 0
+Base.@assume_effects :foldable function _sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
+    return self_size(fieldtype(T, i)) + _sum_field_sizes(T, Val(i-1))
+end
 
 function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
@@ -112,9 +90,10 @@ function blob_offset(::Type{T}, i::Int) where {T}
     end)
 end
 
-# TODO: I really wish there was a way to assert that this would actually
+# TODO(PR): I really wish there was a way to assert that this would actually
 # get done at compile time, so we can feel confident removing the at-generated.
 # I've attempted to do this via `@inferred` tests, but that's not fully sufficient.
+# TODO(PR): Maybe we want some compiler annotations here too?
 @inline function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
     @assert i !== nothing "$T has no field $field"
