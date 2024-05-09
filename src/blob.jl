@@ -142,29 +142,30 @@ end
 #     end
 # end
 
-@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
+@inline function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            unsafe_store!(pointer(blob), value)
-            value
-        end
-    elseif T <: Tuple
-        quote
-            $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
-            end)
-            value
-        end
+        unsafe_store!(pointer(blob), value)
+        value
     else
-        quote
-            $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
-            end)
-            value
-        end
+        _unsafe_store_struct!(blob::Blob{T}, value::T)
+    end
+end
+@generated function _unsafe_store_struct!(blob::Blob{T}, value::T) where {T}
+    quote
+        $(Expr(:meta, :inline))
+        $(@splice (i, field) in enumerate(fieldnames(T)) quote
+            unsafe_store!(getindex(blob, $(Val{field})), value.$field)
+        end)
+        value
+    end
+end
+@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T <: Tuple}
+    quote
+        $(Expr(:meta, :inline))
+        $(@splice (i, field) in enumerate(fieldnames(T)) quote
+            unsafe_store!(getindex(blob, $(Val{field})), value[$field])
+        end)
+        value
     end
 end
 
