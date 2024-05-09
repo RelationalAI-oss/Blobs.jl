@@ -56,4 +56,9 @@
     @testset "self_size" begin
         @test @inferred(Blobs.self_size(Bar)) === 49
     end
+
+    @testset "unsafe_store!" begin
+        bar_value = unsafe_load(bar)
+        @test @inferred(Blobs.unsafe_store!(bar, bar_value)) isa Bar
+    end
 end
