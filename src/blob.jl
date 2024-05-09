@@ -84,16 +84,12 @@ Base.@assume_effects :foldable function _sum_field_sizes(::Type{T}, ::Val{i}) wh
     return self_size(fieldtype(T, i)) + _sum_field_sizes(T, Val(i-1))
 end
 
-function blob_offset(::Type{T}, i::Int) where {T}
+Base.@assume_effects :foldable function blob_offset(::Type{T}, i::Int) where {T}
     +(0, @splice j in 1:(i-1) begin
         self_size(fieldtype(T, j))
     end)
 end
 
-# TODO(PR): I really wish there was a way to assert that this would actually
-# get done at compile time, so we can feel confident removing the at-generated.
-# I've attempted to do this via `@inferred` tests, but that's not fully sufficient.
-# TODO(PR): Maybe we want some compiler annotations here too?
 @inline function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
     @assert i !== nothing "$T has no field $field"
@@ -132,15 +128,6 @@ end
         end
     end
 end
-# TODO: This generates >2x llvm instructions, even though it _is_ type stable...
-# Need to see if there's something better we can do here.
-# @inline function Base.unsafe_load(blob::Blob{T}) where {T}
-#     if isempty(fieldnames(T))
-#         unsafe_load(pointer(blob))
-#     else
-#         T((unsafe_load(getindex(blob, Val{field})) for field in fieldnames(T))...)
-#     end
-# end
 
 @inline function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
