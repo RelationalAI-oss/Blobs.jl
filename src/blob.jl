@@ -116,20 +116,27 @@ Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
-@generated function Base.unsafe_load(blob::Blob{T}) where {T}
+macro _make_new(type, args)
+    # :splatnew lets you directly invoke the type's inner constructor with a Tuple,
+    # bypassing any effects from any custom constructors.
+    return Expr(:splatnew, esc(type), esc(args))
+end
+@inline function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
-        quote
-            $(Expr(:meta, :inline))
-            unsafe_load(pointer(blob))
-        end
+        unsafe_load(pointer(blob))
     else
-        quote
-            $(Expr(:meta, :inline))
-            $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load(getindex(blob, $(Val{field})))
-            end))
-        end
+        # This recursive definition is *almost* as fast as the `@generated` code. On julia
+        # 1.10, it has a single invoke function call here, which adds a few ns overhead.
+        # But on julia 1.11, this generates the expected code and is just as fast.
+        # We are sticking with this version though, to save the `@generated` compilation time.
+        @_make_new(T, _unsafe_load_fields(blob, Val(fieldcount(T))))
     end
+end
+@inline _unsafe_load_fields(::Blob, ::Val{0}) = ()
+function _unsafe_load_fields(blob::Blob{T}, ::Val{I}) where {T, I}
+    @inline
+    types = fieldnames(T)
+    return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, Val{types[I]})))
 end
 
 @inline function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
