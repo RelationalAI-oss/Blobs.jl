@@ -147,6 +147,9 @@ end
         _unsafe_store_struct!(blob::Blob{T}, value::T)
     end
 end
+# Split out the part that needs to be a generated function, to minimize the impact on
+# compilation time. If the branch that calls this function is statically eliminated,
+# julia will never compile this, and so we won't pay the overhead for the generator.
 @generated function _unsafe_store_struct!(blob::Blob{T}, value::T) where {T}
     quote
         $(Expr(:meta, :inline))
