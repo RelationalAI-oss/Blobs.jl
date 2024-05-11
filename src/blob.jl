@@ -144,20 +144,20 @@ end
         unsafe_store!(pointer(blob), value)
         value
     else
-        _unsafe_store_struct!(blob::Blob{T}, value::T)
-    end
-end
-# Split out the part that needs to be a generated function, to minimize the impact on
-# compilation time. If the branch that calls this function is statically eliminated,
-# julia will never compile this, and so we won't pay the overhead for the generator.
-@generated function _unsafe_store_struct!(blob::Blob{T}, value::T) where {T}
-    quote
-        $(Expr(:meta, :inline))
-        $(@splice (i, field) in enumerate(fieldnames(T)) quote
-            unsafe_store!(getindex(blob, $(Val{field})), value.$field)
-        end)
+        _unsafe_store_struct!(blob, value, Val(fieldcount(T)))
         value
     end
+end
+# On julia 1.11, this is equivalantly fast to the `@generated` version.
+# On julia 1.10, this is about 2x slower than generated for medium structs: ~10 ns vs ~5 ns.
+# We will go with the recursive version, to avoid the compilation cost.
+@inline _unsafe_store_struct!(::Blob{T}, ::T, ::Val{0}) where {T} = nothing
+function _unsafe_store_struct!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
+    @inline
+    types = fieldnames(T)
+    _unsafe_store_struct!(blob, value, Val(I-1))
+    unsafe_store!(getindex(blob, Val{types[I]}), getproperty(value, types[I]))
+    nothing
 end
 @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T <: Tuple}
     quote
