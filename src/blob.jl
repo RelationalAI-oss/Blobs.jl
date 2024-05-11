@@ -159,14 +159,17 @@ function _unsafe_store_struct!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
     unsafe_store!(getindex(blob, Val{types[I]}), getproperty(value, types[I]))
     nothing
 end
-@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T <: Tuple}
-    quote
-        $(Expr(:meta, :inline))
-        $(@splice (i, field) in enumerate(fieldnames(T)) quote
-            unsafe_store!(getindex(blob, $(Val{field})), value[$field])
-        end)
-        value
-    end
+# Recursive function for tuples is equivalent to unrolled via `@generated`.
+function Base.unsafe_store!(blob::Blob{T}, value::T) where {T <: Tuple}
+    _unsafe_store_tuple!(blob, value, Val(fieldcount(T)))
+    value
+end
+@inline _unsafe_store_tuple!(::Blob{T}, ::T, ::Val{0}) where {T<:Tuple} = nothing
+function _unsafe_store_tuple!(blob::Blob{T}, value::T, ::Val{I}) where {T<:Tuple, I}
+    @inline
+    _unsafe_store_struct!(blob, value, Val(I-1))
+    unsafe_store!(getindex(blob, Val{I}), value[I])
+    nothing
 end
 
 # if the value is the wrong type, try to convert it (just like setting a field normally)
