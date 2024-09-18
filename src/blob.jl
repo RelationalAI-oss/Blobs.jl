@@ -41,17 +41,15 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-@inline function boundscheck(blob::Blob{T}) where T
-    @boundscheck begin
-        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
-            throw(BoundsError(blob))
-        end
-        @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
+@noinline function boundscheck(blob::Blob, element_size::Int)
+    if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + element_size > getfield(blob, :limit))
+        throw(BoundsError(blob))
     end
+    @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
 end
 
 Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
-    boundscheck(blob)
+    @boundscheck boundscheck(blob, self_size(T))
     unsafe_load(blob)
 end
 
@@ -103,7 +101,7 @@ end
 end
 
 Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
-    boundscheck(blob)
+    @boundscheck boundscheck(blob, self_size(T))
     unsafe_store!(blob, value)
 end
 
@@ -112,7 +110,7 @@ Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
-@generated function Base.unsafe_load(blob::Blob{T}) where {T}
+@noinline @generated function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
@@ -120,7 +118,6 @@ end
         end
     else
         quote
-            $(Expr(:meta, :inline))
             $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
                 unsafe_load(getindex(blob, $(Val{field})))
             end))
@@ -128,7 +125,7 @@ end
     end
 end
 
-@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
+@noinline @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
@@ -137,7 +134,6 @@ end
         end
     elseif T <: Tuple
         quote
-            $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
                 unsafe_store!(getindex(blob, $(Val{field})), value[$field])
             end)
@@ -145,7 +141,6 @@ end
         end
     else
         quote
-            $(Expr(:meta, :inline))
             $(@splice (i, field) in enumerate(fieldnames(T)) quote
                 unsafe_store!(getindex(blob, $(Val{field})), value.$field)
             end)
