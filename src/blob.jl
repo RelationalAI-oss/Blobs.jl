@@ -24,6 +24,14 @@ function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
+function Blob{T}(blob::Blob, rel_offset::Int64) where {T}
+    Blob{T}(
+        getfield(blob, :base),
+        getfield(blob, :offset) + rel_offset,
+        getfield(blob, :limit)
+    )
+end
+
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
@@ -41,15 +49,37 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-@noinline function boundscheck(blob::Blob, element_size::Int)
-    if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + element_size > getfield(blob, :limit))
-        throw(BoundsError(blob))
+# Keep the error throwing out of the specialized code to reduce amount of code that is
+# generated for each type.
+@noinline function _throw_bounds_error(offset::Int, limit::Int, size::Int, type::Type)
+    throw(BoundsError()) #"offset $offset, limit $limit, size $size, type "))
+end
+
+@noinline function _throw_bounds_error(type::Type, index::Int)
+    throw(BoundsError(type, index))
+end
+
+@noinline function _assert_not_null(typename::String)
+    @assert false "Null pointer dereference in Blob{$(type.name.name)}"
+end
+
+@inline function boundscheck(blob::Blob{T}) where T
+    @boundscheck begin
+        base = getfield(blob, :base)
+        offset = getfield(blob, :offset)
+        limit = getfield(blob, :limit)
+        element_size = self_size(T)
+        if (offset < 0) || (offset + element_size > limit)
+            _throw_bounds_error(offset, limit, element_size, T)
+        end
+        if base == Ptr{Nothing}(0)
+            _assert_not_null(T)
+        end
     end
-    @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
 end
 
 Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
-    @boundscheck boundscheck(blob, self_size(T))
+    boundscheck(blob)
     unsafe_load(blob)
 end
 
@@ -86,22 +116,22 @@ end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
-    @assert i != nothing "$T has no field $field"
+    @assert i !== nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
+        $(Blob{fieldtype(T, i)})(blob, $(blob_offset(T, i)))
     end
 end
 
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
-        throw(BoundsError(blob, i))
+        _throw_bounds_error(T, i)
     end
     return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
 end
 
 Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
-    @boundscheck boundscheck(blob, self_size(T))
+    boundscheck(blob)
     unsafe_store!(blob, value)
 end
 
@@ -110,7 +140,7 @@ Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value) where T
     setindex!(blob, convert(T, value))
 end
 
-@noinline @generated function Base.unsafe_load(blob::Blob{T}) where {T}
+@generated function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
@@ -118,31 +148,28 @@ end
         end
     else
         quote
-            $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load(getindex(blob, $(Val{field})))
-            end))
+            $(Expr(:meta, :inline))
+            $(Expr(
+                :new,
+                T,
+                @splice field in fieldnames(T) :(unsafe_load(blob[$(Val{field})]))
+            ))
         end
     end
 end
 
-@noinline @generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
+@generated function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
     if isempty(fieldnames(T))
         quote
             $(Expr(:meta, :inline))
             unsafe_store!(pointer(blob), value)
             value
         end
-    elseif T <: Tuple
-        quote
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
-            end)
-            value
-        end
     else
         quote
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
+            $(Expr(:meta, :inline))
+            $(@splice field in fieldnames(T) quote
+                unsafe_store!(blob[$(Val{field})], value.$field)
             end)
             value
         end
