@@ -49,18 +49,8 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-# Keep the error throwing out of the specialized code to reduce amount of code that is
-# generated for each type.
-@noinline function _throw_bounds_error(offset::Int, limit::Int, size::Int, type::Type)
-    throw(BoundsError()) #"offset $offset, limit $limit, size $size, type "))
-end
-
-@noinline function _throw_bounds_error(type::Type, index::Int)
-    throw(BoundsError(type, index))
-end
-
-@noinline function _assert_not_null(typename::String)
-    @assert false "Null pointer dereference in Blob{$(type.name.name)}"
+@noinline function _throw_assert_not_null_error(typename::Symbol)
+    throw(AssertionError("Null pointer dereference in Blob{$(typename)}"))
 end
 
 @inline function boundscheck(blob::Blob{T}) where T
@@ -70,10 +60,10 @@ end
         limit = getfield(blob, :limit)
         element_size = self_size(T)
         if (offset < 0) || (offset + element_size > limit)
-            _throw_bounds_error(offset, limit, element_size, T)
+            throw(BoundsError())
         end
         if base == Ptr{Nothing}(0)
-            _assert_not_null(T)
+            _throw_assert_not_null_error(T.name.name)
         end
     end
 end
@@ -125,7 +115,7 @@ end
 
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
-        _throw_bounds_error(T, i)
+        throw(BoundsError())
     end
     return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
 end
