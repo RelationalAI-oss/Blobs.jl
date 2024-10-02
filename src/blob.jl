@@ -24,6 +24,14 @@ function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
+function Blob{T}(blob::Blob, rel_offset::Int64) where {T}
+    Blob{T}(
+        getfield(blob, :base),
+        getfield(blob, :offset) + rel_offset,
+        getfield(blob, :limit)
+    )
+end
+
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
 end
@@ -41,12 +49,22 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
+@noinline function _throw_assert_not_null_error(typename::Symbol)
+    throw(AssertionError("Null pointer dereference in Blob{$(typename)}"))
+end
+
 @inline function boundscheck(blob::Blob{T}) where T
     @boundscheck begin
-        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
-            throw(BoundsError(blob))
+        base = getfield(blob, :base)
+        offset = getfield(blob, :offset)
+        limit = getfield(blob, :limit)
+        element_size = self_size(T)
+        if (offset < 0) || (offset + element_size > limit)
+            throw(BoundsError())
         end
-        @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
+        if base == Ptr{Nothing}(0)
+            _throw_assert_not_null_error(T.name.name)
+        end
     end
 end
 
@@ -88,16 +106,16 @@ end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
-    @assert i != nothing "$T has no field $field"
+    @assert i !== nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
+        $(Blob{fieldtype(T, i)})(blob, $(blob_offset(T, i)))
     end
 end
 
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
-        throw(BoundsError(blob, i))
+        throw(BoundsError())
     end
     return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
 end
@@ -121,9 +139,11 @@ end
     else
         quote
             $(Expr(:meta, :inline))
-            $(Expr(:new, T, @splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_load(getindex(blob, $(Val{field})))
-            end))
+            $(Expr(
+                :new,
+                T,
+                @splice field in fieldnames(T) :(unsafe_load(blob[$(Val{field})]))
+            ))
         end
     end
 end
@@ -135,19 +155,11 @@ end
             unsafe_store!(pointer(blob), value)
             value
         end
-    elseif T <: Tuple
-        quote
-            $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value[$field])
-            end)
-            value
-        end
     else
         quote
             $(Expr(:meta, :inline))
-            $(@splice (i, field) in enumerate(fieldnames(T)) quote
-                unsafe_store!(getindex(blob, $(Val{field})), value.$field)
+            $(@splice field in fieldnames(T) quote
+                unsafe_store!(blob[$(Val{field})], value.$field)
             end)
             value
         end
