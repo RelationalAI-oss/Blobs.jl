@@ -86,11 +86,7 @@ end
 
 # Recursion scales better than splatting for large numbers of fields.
 Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
-    return _blob_offset(T, i-1)
-end
-Base.@assume_effects :foldable @inline function _blob_offset(::Type{T}, i::Int) where {T}
-    i <= 0 && return 0
-    return _blob_offset(T, i-1) + self_size(fieldtype(T, i))
+    _sum_field_sizes(T, i - 1)
 end
 
 @inline function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
