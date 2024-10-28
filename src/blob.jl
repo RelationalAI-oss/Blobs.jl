@@ -29,7 +29,7 @@ struct Blob{T}
             end
             @assert base != Ptr{Nothing}(0) "Null pointer dereference in $(T)"
         end
-        new(base, offset, limit)
+        new{T}(base, offset, limit)
     end
 end
 
