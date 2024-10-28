@@ -6,7 +6,7 @@ struct BlobVector{T} <: AbstractArray{T, 1}
     function BlobVector{T}(data::Blob{T}, length::Int64) where T
         @assert length >= 0
         @boundscheck begin
-            if length * self_size(T) > allocated_size(data)
+            if length * self_size(T) > available_size(data)
                 throw(InvalidBlobError(
                     BlobVector{T}, getfield(data, :base), getfield(data, :offset),
                     getfield(data, :limit), length),

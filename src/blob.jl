@@ -46,7 +46,7 @@ Base.@propagate_inbounds function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
-allocated_size(blob::Blob{T}) where T = getfield(blob, :limit) - getfield(blob, :offset)
+available_size(blob::Blob{T}) where T = getfield(blob, :limit) - getfield(blob, :offset)
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"

@@ -102,8 +102,8 @@ Allocate and initialize a new `Blob{T}`.
 """
 function malloc_and_init(::Type{T}, args...)::Blob{T} where T
     blob = malloc(T, args...)
-    used = init(blob, args...)
-    @assert used - blob == allocated_size(blob)
+    used = @inbounds init(blob, args...)
+    @assert used - blob == available_size(blob)
     return blob
 end
 

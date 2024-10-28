@@ -6,7 +6,7 @@ struct BlobString <: AbstractString
     function BlobString(data::Blob{UInt8}, len::Int64)
         @assert len >= 0
         @boundscheck begin
-            if len * self_size(UInt8) > allocated_size(data)
+            if len * self_size(UInt8) > available_size(data)
                 throw(InvalidBlobError(
                     BlobString, getfield(data, :base), getfield(data, :offset),
                     getfield(data, :limit), len),

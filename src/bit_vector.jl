@@ -22,7 +22,7 @@ struct BlobBitVector <: AbstractArray{Bool, 1}
     function BlobBitVector(data::Blob{UInt64}, length::Int64)
         @assert length >= 0
         @boundscheck begin
-            if div(length + 7,  8) > allocated_size(data)
+            if div(length + 7,  8) > available_size(data)
                 throw(InvalidBlobError(
                     BlobBitVector,
                     getfield(data, :base),
