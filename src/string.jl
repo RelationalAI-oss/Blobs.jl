@@ -2,6 +2,19 @@
 struct BlobString <: AbstractString
     data::Blob{UInt8}
     len::Int64 # in bytes
+
+    function BlobString(data::Blob{UInt8}, len::Int64)
+        @assert len >= 0
+        @boundscheck begin
+            if len * self_size(UInt8) > allocated_size(data)
+                throw(InvalidBlobError(
+                    BlobString, getfield(data, :base), getfield(data, :offset),
+                    getfield(data, :limit), len),
+                )
+            end
+        end
+        new(data, len)
+    end
 end
 
 Base.pointer(blob::BlobString) = pointer(blob, 1)
@@ -187,4 +200,3 @@ end
 ## overload methods for efficiency ##
 
 Base.isvalid(s::BlobString, i::Int) = checkbounds(Bool, s, i) && thisind(s, i) == i
-

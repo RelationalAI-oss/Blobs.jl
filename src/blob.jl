@@ -1,4 +1,19 @@
+struct InvalidBlobError <: Exception
+    type::Type
+    base::Ptr{Nothing}
+    offset::Int64
+    limit::Int64
+    length::Int64
+end
+
+function Base.showerror(io::IO, e::InvalidBlobError)
+    print(io, "InvalidBlobError: $(e.type) needs $(e.length) * $(self_size(e.type)) bytes. \
+        Got length($(e.offset):$(e.limit)) == $(e.limit - e.offset) bytes")
+end
+
 """
+    Blob{T}
+
 A pointer to a `T` stored inside a Blob.
 """
 struct Blob{T}
@@ -8,21 +23,30 @@ struct Blob{T}
 
     function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
         @assert isbitstype(T)
+        @boundscheck begin
+            if offset < 0 || offset + self_size(T) > limit
+                throw(InvalidBlobError(Blob{T}, base, offset, limit, 1))
+            end
+            @assert base != Ptr{Nothing}(0) "Null pointer dereference in $(T)"
+        end
         new(base, offset, limit)
     end
 end
 
-function Blob(ref::Base.RefValue{T}) where T
+Base.@propagate_inbounds function Blob(ref::Base.RefValue{T}) where T
     Blob{T}(pointer_from_objref(ref), 0, sizeof(T))
 end
 
+Base.@propagate_inbounds \
 function Blob(base::Ptr{T}, offset::Int64 = 0, limit::Int64 = sizeof(T)) where {T}
     Blob{T}(Ptr{Nothing}(base), offset, limit)
 end
 
-function Blob{T}(blob::Blob) where T
+Base.@propagate_inbounds function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
+
+allocated_size(blob::Blob{T}) where T = getfield(blob, :limit) - getfield(blob, :offset)
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
@@ -32,7 +56,7 @@ function Base.pointer(blob::Blob{T}) where T
     convert(Ptr{T}, getfield(blob, :base) + getfield(blob, :offset))
 end
 
-function Base.:+(blob::Blob{T}, offset::Integer) where T
+Base.@propagate_inbounds function Base.:+(blob::Blob{T}, offset::Integer) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset) + offset, getfield(blob, :limit))
 end
 
@@ -41,17 +65,7 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-@inline function boundscheck(blob::Blob{T}) where T
-    @boundscheck begin
-        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
-            throw(BoundsError(blob))
-        end
-        @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
-    end
-end
-
-Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
-    boundscheck(blob)
+function Base.getindex(blob::Blob{T}) where T
     unsafe_load(blob)
 end
 
@@ -88,10 +102,10 @@ end
 
 @generated function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
-    @assert i != nothing "$T has no field $field"
+    @assert i !== nothing "$T has no field $field"
     quote
         $(Expr(:meta, :inline))
-        Blob{$(fieldtype(T, i))}(blob + $(blob_offset(T, i)))
+        @inbounds Blob{$(fieldtype(T, i))}(blob) + $(blob_offset(T, i))
     end
 end
 
@@ -99,11 +113,10 @@ end
     @boundscheck if i < 1 || i > fieldcount(T)
         throw(BoundsError(blob, i))
     end
-    return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
+    return @inbounds Blob{fieldtype(T, i)}(blob) + Blobs.blob_offset(T, i)
 end
 
 Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
-    boundscheck(blob)
     unsafe_store!(blob, value)
 end
 

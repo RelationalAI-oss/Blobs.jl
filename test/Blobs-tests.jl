@@ -2,7 +2,7 @@
 
 module TestBlobs
 
-using Blobs
+using Blobs: Blobs, Blob, BlobBitVector, BlobString, BlobVector, InvalidBlobError
 using Test
 
 struct Foo
@@ -11,15 +11,6 @@ struct Foo
 end
 
 # Blob
-
-blob = Blob{Int64}(Libc.malloc(16), 0, 8)
-@test_nowarn blob[]
-@test_throws BoundsError (blob+1)[]
-if Base.JLOptions().check_bounds == 0
-    # @inbounds only kicks in if compiled
-    f1(blob) = @inbounds (blob+1)[]
-    f1(blob)
-end
 
 foo = Blobs.malloc_and_init(Foo)
 foo.x[] = 1
@@ -58,7 +49,8 @@ foo.x[] = 1
 @test Blobs.self_size(BlobVector{Int64}) == 16
 
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
-bv = BlobVector{Int64}(data, 4)
+@test_throws InvalidBlobError BlobVector{Int64}(data, 4)
+bv = BlobVector{Int64}(data, 3)
 @test_nowarn bv[3]
 @test_throws BoundsError bv[4]
 if Base.JLOptions().check_bounds == 0
@@ -121,7 +113,8 @@ copy!(bv3, 1, bv3, 2, 4)
 @test Blobs.child_size(BlobBitVector, 64*3 + 1) == 8*4
 
 data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4), 0, sizeof(UInt64)*3)
-bv = BlobBitVector(data, 64*4)
+@test_throws InvalidBlobError BlobBitVector(data, 64*4)
+bv =  BlobBitVector(data, 64*3)
 @test_nowarn bv[64*3]
 @test_throws BoundsError bv[64*3 + 1]
 if Base.JLOptions().check_bounds == 0
@@ -173,8 +166,8 @@ bv2[] = true
 
 data = Blob{UInt8}(Libc.malloc(8), 0, 8)
 @test_nowarn BlobString(data, 8)[8]
-# pretty much any access to a unicode string touches beginning and end
-@test_throws BoundsError BlobString(data, 16)[8]
+@test_throws BoundsError BlobString(data, 8)[9]
+@test_throws InvalidBlobError BlobString(data, 16)
 # @inbounds doesn't work for strings - too much work to propagate
 
 # test strings and unicode
@@ -336,3 +329,14 @@ bt[] = (Toto{1}((0x0,), 8),)
 end
 
 end  # testitem
+
+@testitem "invalid Blob" begin
+    using Blobs: Blob, InvalidBlobError
+
+    @test_throws InvalidBlobError Blob{Int64}(Ptr{Nothing}(1), 0, 7)
+    @test_throws InvalidBlobError Blob{Int64}(Ptr{Nothing}(1), 4, 9)
+
+    # @inbounds won't work directly from @test @inbounds ...
+    inbounds_blob() = @inbounds Blob{Int64}(Ptr{Nothing}(1), 4, 9)
+    @test inbounds_blob() !== nothing
+end
