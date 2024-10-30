@@ -22,9 +22,10 @@ foo.y[] = 2.5
 @test foo == foo
 @test pointer(foo.y) == pointer(foo) + sizeof(Int64)
 
-foo2_ref = Ref(Foo(42, 3.14))
-foo2 = Blob(foo2_ref)
-@test foo2[] == Foo(42, 3.14)
+println("foo $(sizeof(Foo)) $(Blobs.self_size(Foo))")
+
+# Cannot create a blob directly from Ref{Foo} because of different alignment
+foo2 = Blobs.malloc_and_init(Foo)
 
 foo3_arr = [Foo(1, -1), Foo(2, -2)]
 foo31 = Blob(pointer(foo3_arr), 0, 2sizeof(Foo))
@@ -327,8 +328,45 @@ bt[] = (Toto{1}((0x0,), 8),)
 @test_throws ErrorException Blobs.malloc_and_init(String)
 
 end
-
 end  # testitem
+
+@testitem "references no-alignment" begin
+    using Blobs
+
+    struct S
+        x::Int64
+        y::Float64
+    end
+    @assert sizeof(S) == Blobs.self_size(S)
+
+    s = S(1, 2.5)
+    bs = Blob(Ref(s))
+    @test bs.x[] == 1
+    @test bs.y[] == 2.5
+    @test s == bs[]
+end
+
+@testitem "references unaligned" begin
+    using Blobs
+
+    struct S
+        x::Int16    # Aligned to word size
+        y::Float64
+    end
+    @assert sizeof(S) > Blobs.self_size(S)
+
+    s = S(1, 2.5)
+    @test_throws AssertionError Blob(Ref(s))
+
+    su = Blobs.malloc(S)
+    try
+        su[] = s
+        @test su.x[] == 1
+        @test su.y[] == 2.5
+    finally
+        Blobs.free(su)
+    end
+end
 
 @testitem "invalid Blob" begin
     using Blobs: Blob, InvalidBlobError
