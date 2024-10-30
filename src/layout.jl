@@ -12,7 +12,7 @@ child_size(::Type{T}) where T = 0
 
 Initialize `blob`.
 
-Assumes that `blob` it at least `self_size(T) + child_size(T, args...)` bytes long.
+Assumes that `blob` is at least `self_size(T) + child_size(T, args...)` bytes long.
 """
 function init(blob::Blob{T}, args...) where T
     init(blob, Blob{Nothing}(blob + self_size(T)), args...)
