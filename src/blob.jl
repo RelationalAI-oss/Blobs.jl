@@ -61,15 +61,17 @@ struct Blob{T}
 
     function Blob{T}(base::Ptr{Nothing}, offset::Int64, limit::Int64) where {T}
         @assert isbitstype(T)
-        @boundscheck begin
-            if offset < 0 || offset + self_size(T) > limit
-                throw(InvalidBlobError(Blob{T}, base, offset, limit, 1))
-            end
-            if limit > 0 && base == Ptr{Nothing}(0)
-                throw(AssertionError("Null pointer reference Blob{$(T)}"))
-            end
-        end
+        @boundscheck _bounds_check(base, offset, limit, T)
         new{T}(base, offset, limit)
+    end
+end
+
+@noinline function _bounds_check(base::Ptr{Nothing}, offset::Int64, limit::Int64, T::DataType)
+    if offset < 0 || offset + self_size(T) > limit
+        throw(InvalidBlobError(Blob{T}, base, offset, limit, 1))
+    end
+    if limit > 0 && base == Ptr{Nothing}(0)
+        throw(AssertionError("Null pointer reference Blob{$(T)}"))
     end
 end
 
