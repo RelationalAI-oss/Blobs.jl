@@ -2,7 +2,7 @@
 
 module TestBlobs
 
-using Blobs
+using Blobs: Blobs, Blob, BlobBitVector, BlobString, BlobVector, InvalidBlobError
 using Test
 
 struct Foo
@@ -11,15 +11,6 @@ struct Foo
 end
 
 # Blob
-
-blob = Blob{Int64}(Libc.malloc(16), 0, 8)
-@test_nowarn blob[]
-@test_throws BoundsError (blob+1)[]
-if Base.JLOptions().check_bounds == 0
-    # @inbounds only kicks in if compiled
-    f1(blob) = @inbounds (blob+1)[]
-    f1(blob)
-end
 
 foo = Blobs.malloc_and_init(Foo)
 foo.x[] = 1
@@ -31,9 +22,10 @@ foo.y[] = 2.5
 @test foo == foo
 @test pointer(foo.y) == pointer(foo) + sizeof(Int64)
 
-foo2_ref = Ref(Foo(42, 3.14))
-foo2 = Blob(foo2_ref)
-@test foo2[] == Foo(42, 3.14)
+println("foo $(sizeof(Foo)) $(Blobs.self_size(Foo))")
+
+# Cannot create a blob directly from Ref{Foo} because of different alignment
+foo2 = Blobs.malloc_and_init(Foo)
 
 foo3_arr = [Foo(1, -1), Foo(2, -2)]
 foo31 = Blob(pointer(foo3_arr), 0, 2sizeof(Foo))
@@ -58,7 +50,8 @@ foo.x[] = 1
 @test Blobs.self_size(BlobVector{Int64}) == 16
 
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
-bv = BlobVector{Int64}(data, 4)
+@test_throws InvalidBlobError BlobVector{Int64}(data, 4)
+bv = BlobVector{Int64}(data, 3)
 @test_nowarn bv[3]
 @test_throws BoundsError bv[4]
 if Base.JLOptions().check_bounds == 0
@@ -121,7 +114,8 @@ copy!(bv3, 1, bv3, 2, 4)
 @test Blobs.child_size(BlobBitVector, 64*3 + 1) == 8*4
 
 data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4), 0, sizeof(UInt64)*3)
-bv = BlobBitVector(data, 64*4)
+@test_throws InvalidBlobError BlobBitVector(data, 64*4)
+bv =  BlobBitVector(data, 64*3)
 @test_nowarn bv[64*3]
 @test_throws BoundsError bv[64*3 + 1]
 if Base.JLOptions().check_bounds == 0
@@ -173,8 +167,8 @@ bv2[] = true
 
 data = Blob{UInt8}(Libc.malloc(8), 0, 8)
 @test_nowarn BlobString(data, 8)[8]
-# pretty much any access to a unicode string touches beginning and end
-@test_throws BoundsError BlobString(data, 16)[8]
+@test_throws BoundsError BlobString(data, 8)[9]
+@test_throws InvalidBlobError BlobString(data, 16)
 # @inbounds doesn't work for strings - too much work to propagate
 
 # test strings and unicode
@@ -334,5 +328,53 @@ bt[] = (Toto{1}((0x0,), 8),)
 @test_throws ErrorException Blobs.malloc_and_init(String)
 
 end
-
 end  # testitem
+
+@testitem "references no-alignment" begin
+    using Blobs
+
+    struct S
+        x::Int64
+        y::Float64
+    end
+    @assert sizeof(S) == Blobs.self_size(S)
+
+    s = S(1, 2.5)
+    bs = Blob(Ref(s))
+    @test bs.x[] == 1
+    @test bs.y[] == 2.5
+    @test s == bs[]
+end
+
+@testitem "references unaligned" begin
+    using Blobs
+
+    struct S
+        x::Int16    # Aligned to word size
+        y::Float64
+    end
+    @assert sizeof(S) > Blobs.self_size(S)
+
+    s = S(1, 2.5)
+    @test_throws AssertionError Blob(Ref(s))
+
+    su = Blobs.malloc(S)
+    try
+        su[] = s
+        @test su.x[] == 1
+        @test su.y[] == 2.5
+    finally
+        Blobs.free(su)
+    end
+end
+
+@testitem "invalid Blob" begin
+    using Blobs: Blob, InvalidBlobError
+
+    @test_throws InvalidBlobError Blob{Int64}(Ptr{Nothing}(1), 0, 7)
+    @test_throws InvalidBlobError Blob{Int64}(Ptr{Nothing}(1), 4, 9)
+
+    # @inbounds won't work directly from @test @inbounds ...
+    inbounds_blob() = @inbounds Blob{Int64}(Ptr{Nothing}(1), 4, 9)
+    @test inbounds_blob() !== nothing
+end

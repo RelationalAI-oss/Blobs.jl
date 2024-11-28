@@ -15,7 +15,7 @@ Initialize `blob`.
 Assumes that `blob` is at least `self_size(T) + child_size(T, args...)` bytes long.
 """
 function init(blob::Blob{T}, args...) where T
-    init(blob, Blob{Nothing}(blob + self_size(T)), args...)
+    init(blob, Blob{Nothing}(blob) + self_size(T), args...)
 end
 
 """
@@ -78,7 +78,9 @@ Allocate an uninitialized `Blob{T}`.
 """
 function malloc(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
-    Blob{T}(Libc.malloc(size), 0, size)
+    base = Libc.malloc(size)
+    base == Ptr{Nothing}(0) && throw(OutOfMemoryError())
+    return @inbounds Blob{T}(base, 0, size)
 end
 
 """
@@ -88,7 +90,9 @@ Allocate a zero-initialized `Blob{T}`.
 """
 function calloc(::Type{T}, args...)::Blob{T} where T
     size = self_size(T) + child_size(T, args...)
-    Blob{T}(Libc.calloc(1, size), 0, size)
+    base = Libc.calloc(1, size)
+    base == Ptr{Nothing}(0) && throw(OutOfMemoryError())
+    return @inbounds Blob{T}(base, 0, size)
 end
 
 """
@@ -97,11 +101,10 @@ end
 Allocate and initialize a new `Blob{T}`.
 """
 function malloc_and_init(::Type{T}, args...)::Blob{T} where T
-    size = self_size(T) + child_size(T, args...)
-    blob = Blob{T}(Libc.malloc(size), 0, size)
-    used = init(blob, args...)
-    @assert used - blob == size
-    blob
+    blob = malloc(T, args...)
+    used = @inbounds init(blob, args...)
+    @assert used - blob == available_size(blob)
+    return blob
 end
 
 """

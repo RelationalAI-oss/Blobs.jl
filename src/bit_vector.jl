@@ -18,6 +18,22 @@ end
 struct BlobBitVector <: AbstractArray{Bool, 1}
     data::Blob{UInt64}
     length::Int64
+
+    function BlobBitVector(data::Blob{UInt64}, length::Int64)
+        @assert length >= 0
+        @boundscheck begin
+            if div(length, self_size(UInt64), RoundUp) > available_size(data)
+                throw(InvalidBlobError(
+                    BlobBitVector,
+                    getfield(data, :base),
+                    getfield(data, :offset),
+                    getfield(data, :limit),
+                    div(length + 7,  8)),
+                )
+            end
+        end
+        new(data, length)
+    end
 end
 
 Base.@propagate_inbounds function get_address(blob::BlobBitVector, i::Int)::BlobBit
