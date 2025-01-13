@@ -86,13 +86,18 @@ end
 
 # Recursion scales better than splatting for large numbers of fields.
 Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
-    _sum_field_sizes(T, i - 1)
+    _sum_field_sizes(T, Val(i - 1))
 end
 
-@inline function Base.getindex(blob::Blob{T}, ::Type{Val{field}}) where {T, field}
+Base.@assume_effects :foldable function fieldidx(::Type{T}, ::Val{field}) where {T, field}
     i = findfirst(isequal(field), fieldnames(T))
     @assert i !== nothing "$T has no field $field"
-    Blob{fieldtype(T, i)}(blob + (blob_offset(T, i)))
+    return i
+end
+@inline function Base.getindex(blob::Blob{T}, ::Val{field}) where {T, field}
+    i = fieldidx(T, Val(field))
+    FT = fieldtype(T, i)
+    Blob{FT}(blob + blob_offset(T, i))
 end
 
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
@@ -180,7 +185,7 @@ function Base.propertynames(::Blob{T}, private::Bool=false) where T
 end
 
 function Base.getproperty(blob::Blob{T}, field::Symbol) where T
-    getindex(blob, Val{field})
+    getindex(blob, Val(field))
 end
 
 function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
