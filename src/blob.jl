@@ -70,7 +70,7 @@ Base.@assume_effects :foldable function self_size(::Type{T}) where T
         sizeof(T)
     else
         # Recursion is the fastest way to compile this, confirmed with benchmarks.
-        # Alternatives considered: 
+        # Alternatives considered:
         # - +(Iterators.map(self_size, fieldtypes(T))...)
         # - runtime_size for-loop (below).
         # Splatting is always slower, and breaks after ~30 fields.
@@ -107,7 +107,7 @@ Base.@assume_effects :foldable function fieldidx(::Type{T}, ::Val{field}) where 
     @assert i !== nothing "$T has no field $field"
     return i
 end
-@inline function Base.getindex(blob::Blob{T}, ::Val{field}) where {T, field}
+@inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
     i = fieldidx(T, Val(field))
     FT = fieldtype(T, i)
     Blob{FT}(blob + blob_offset(T, i))
@@ -198,7 +198,7 @@ function Base.propertynames(::Blob{T}, private::Bool=false) where T
 end
 
 function Base.getproperty(blob::Blob{T}, field::Symbol) where T
-    getindex(blob, Val(field))
+    getindex(blob, field)
 end
 
 function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
