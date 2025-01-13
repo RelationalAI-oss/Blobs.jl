@@ -137,7 +137,7 @@ end
 function _unsafe_load_fields(blob::Blob{T}, ::Val{I}) where {T, I}
     @inline
     types = fieldnames(T)
-    return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, Val{types[I]})))
+    return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, Val(types[I]))))
 end
 
 @inline function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
@@ -157,7 +157,7 @@ function _unsafe_store_struct!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
     @inline
     types = fieldnames(T)
     _unsafe_store_struct!(blob, value, Val(I-1))
-    unsafe_store!(getindex(blob, Val{types[I]}), getproperty(value, types[I]))
+    unsafe_store!(getindex(blob, Val(types[I])), getproperty(value, types[I]))
     nothing
 end
 # Recursive function for tuples is equivalent to unrolled via `@generated`.
@@ -169,7 +169,7 @@ end
 function _unsafe_store_tuple!(blob::Blob{T}, value::T, ::Val{I}) where {T<:Tuple, I}
     @inline
     _unsafe_store_struct!(blob, value, Val(I-1))
-    unsafe_store!(getindex(blob, Val{I}), value[I])
+    unsafe_store!(getindex(blob, Val(I)), value[I])
     nothing
 end
 
@@ -189,7 +189,7 @@ function Base.getproperty(blob::Blob{T}, field::Symbol) where T
 end
 
 function Base.setproperty!(blob::Blob{T}, field::Symbol, value) where T
-    setindex!(blob, Val{field}, value)
+    setindex!(blob, Val(field), value)
 end
 
 function rewrite_address(expr)
@@ -204,7 +204,7 @@ function rewrite_address(expr)
         else
             error("Impossible?")
         end
-        :(getindex($(rewrite_address(object)), $(Val{fieldname})))
+        :(getindex($(rewrite_address(object)), $(Val(fieldname))))
     elseif expr.head == :ref
         object = expr.args[1]
         :(getindex($(rewrite_address(object)), $(map(esc, expr.args[2:end])...)))
