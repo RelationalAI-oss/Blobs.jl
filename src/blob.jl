@@ -64,18 +64,31 @@ The number of bytes needed to allocate `T` itself.
 Defaults to `sizeof(T)`.
 """
 Base.@assume_effects :foldable function self_size(::Type{T}) where T
-    # This function is marked :total to encourage constant folding for this types-only
+    # This function is marked :foldable to encourage constant folding for this types-only
     # static computation.
     if isempty(fieldnames(T))
         sizeof(T)
     else
         # Recursion is the fastest way to compile this, confirmed with benchmarks.
-        # Alternative considered: +(Iterators.map(self_size, fieldtypes(T))...)
-        # ~0.5ms for 5 fields, vs ~5ms for unrolling via splatting the fields.
-        # ~3ms for 20 fields, vs ~6ms for splatting.
-        # Note that splatting gives up after ~30 fields, whereas recursion remains robust.
-        _sum_field_sizes(T)
+        # Alternatives considered: 
+        # - +(Iterators.map(self_size, fieldtypes(T))...)
+        # - runtime_size for-loop (below).
+        # Splatting is always slower, and breaks after ~30 fields.
+        # The for-loop is faster after around 15-30 fields, so we pick an
+        # arbitrary cutoff of 20:
+        if fieldcount(T) > 20
+            runtime_size(T)
+        else
+            _sum_field_sizes(T)
+        end
     end
+end
+runtime_size(::Type{T}) where T =
+    let out = 0
+    for f in fieldtypes(T)
+        out += Blobs.self_size(f)
+    end
+    out
 end
 Base.@assume_effects :foldable _sum_field_sizes(::Type{T}) where {T} =
     _sum_field_sizes(T, Val(fieldcount(T)))
