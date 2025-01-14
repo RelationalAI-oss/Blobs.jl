@@ -77,29 +77,29 @@ Base.@assume_effects :foldable function self_size(::Type{T}) where T
         # The for-loop is faster after around 15-30 fields, so we pick an
         # arbitrary cutoff of 20:
         if fieldcount(T) > 20
-            runtime_size(T)
+            _iterative_sum_field_sizes(T)
         else
-            _sum_field_sizes(T)
+            _recursive_sum_field_sizes(T)
         end
     end
 end
-function runtime_size(::Type{T}) where T
+function _iterative_sum_field_sizes(::Type{T}) where T
     out = 0
     for f in fieldtypes(T)
         out += Blobs.self_size(f)
     end
     out
 end
-Base.@assume_effects :foldable _sum_field_sizes(::Type{T}) where {T} =
-    _sum_field_sizes(T, Val(fieldcount(T)))
-Base.@assume_effects :foldable _sum_field_sizes(::Type, ::Val{0}) = 0
-Base.@assume_effects :foldable function _sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
-    return self_size(fieldtype(T, i)) + _sum_field_sizes(T, Val(i-1))
+Base.@assume_effects :foldable _recursive_sum_field_sizes(::Type{T}) where {T} =
+    _recursive_sum_field_sizes(T, Val(fieldcount(T)))
+Base.@assume_effects :foldable _recursive_sum_field_sizes(::Type, ::Val{0}) = 0
+Base.@assume_effects :foldable function _recursive_sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
+    return self_size(fieldtype(T, i)) + _recursive_sum_field_sizes(T, Val(i-1))
 end
 
 # Recursion scales better than splatting for large numbers of fields.
 Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
-    _sum_field_sizes(T, Val(i - 1))
+    _recursive_sum_field_sizes(T, Val(i - 1))
 end
 
 Base.@assume_effects :foldable function fieldidx(::Type{T}, ::Val{field}) where {T, field}
