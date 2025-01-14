@@ -25,7 +25,11 @@ function Blob{T}(blob::Blob) where T
 end
 
 function assert_same_allocation(blob1::Blob, blob2::Blob)
-    @assert getfield(blob1, :base) == getfield(blob2, :base) "These blobs do not share the same allocation: $blob1 - $blob2"
+    @noinline _throw(blob1, blob2) =
+        throw(AssertionError("These blobs do not share the same allocation: $blob1 - $blob2"))
+    if getfield(blob1, :base) != getfield(blob2, :base)
+        _throw(blob1, blob2)
+    end
 end
 
 function Base.pointer(blob::Blob{T}) where T
