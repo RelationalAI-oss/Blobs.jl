@@ -102,13 +102,13 @@ Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) w
     _recursive_sum_field_sizes(T, Val(i - 1))
 end
 
-Base.@assume_effects :foldable function fieldidx(::Type{T}, ::Val{field}) where {T, field}
+@inline function fieldidx(::Type{T}, field) where T
     i = findfirst(isequal(field), fieldnames(T))
     @assert i !== nothing "$T has no field $field"
     return i
 end
 @inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
-    i = fieldidx(T, Val(field))
+    i = fieldidx(T, field)
     FT = fieldtype(T, i)
     Blob{FT}(blob + blob_offset(T, i))
 end
