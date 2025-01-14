@@ -1,4 +1,6 @@
 @testitem "type-stability" begin
+    using BenchmarkTools
+
     struct Quux
         x::BlobVector{Int}
         y::Float64
@@ -42,23 +44,34 @@
     bar = Blobs.malloc_and_init(Bar, 10, false, 20, 15, 1.5)
 
     # Test type stability
+    test_getproperty1(b) = b.e
+    test_getproperty2(b) = b.d
     @testset "getindex" begin
-        test_getproperty1(b) = b.e
         @test @inferred(test_getproperty1(bar)) === bar.e
-        test_getproperty2(b) = b.d
+        @test @ballocated(test_getproperty1($bar)) === 0
         @test @inferred(test_getproperty2(bar)) === bar.d
+        @test @ballocated(test_getproperty2($bar)) === 0
     end
 
     @testset "unsafe_load" begin
         @test @inferred(unsafe_load(bar)) isa Bar
+        @test @ballocated(unsafe_load($bar)) === 0
     end
 
     @testset "self_size" begin
         @test @inferred(Blobs.self_size(Bar)) === 49
+        @test @ballocated(Blobs.self_size(Bar)) === 0
     end
 
     @testset "unsafe_store!" begin
         bar_value = unsafe_load(bar)
         @test @inferred(Blobs.unsafe_store!(bar, bar_value)) isa Bar
+        @test @ballocated(Blobs.unsafe_store!($bar, $bar_value)) === 0
+    end
+
+    read_and_write(bar) = (bar.e[].y[] = bar.a[])
+    @testset "load & store" begin
+        @test @inferred(read_and_write(bar)) isa Int
+        @test @ballocated(read_and_write($bar)) === 0
     end
 end
