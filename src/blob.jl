@@ -102,13 +102,20 @@ Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) w
     _recursive_sum_field_sizes(T, Val(i - 1))
 end
 
-@inline function fieldidx(::Type{T}, field) where T
-    i = findfirst(isequal(field), fieldnames(T))
-    @assert i !== nothing "$T has no field $field"
-    return i
+# Manually write a compile-time loop in the type domain, to enforce constant-folding the
+# fieldidx even for large structs (with e.g. 100 fields). This might make compiling a touch
+# slower, but it allows this to work for even large structs, like the manually-written
+# `@generated` functions did before.
+@inline function fieldidx(::Type{T}, ::Val{field}) where {T,field}
+    return _fieldidx_lookup(T, Val(field), Val(fieldcount(T)))
 end
+_fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{0}) where {T,field} =
+    error("$T has no field $field")
+_fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{i}) where {T,i,field} =
+    fieldname(T, i) === field ? i : _fieldidx_lookup(T, Val(field), Val(i-1))
+
 @inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
-    i = fieldidx(T, field)
+    i = fieldidx(T, Val(field))
     FT = fieldtype(T, i)
     Blob{FT}(blob + blob_offset(T, i))
 end
