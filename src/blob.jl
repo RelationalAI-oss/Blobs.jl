@@ -83,8 +83,8 @@ Base.@assume_effects :foldable function self_size(::Type{T}) where T
         end
     end
 end
-runtime_size(::Type{T}) where T =
-    let out = 0
+function runtime_size(::Type{T}) where T
+    out = 0
     for f in fieldtypes(T)
         out += Blobs.self_size(f)
     end
