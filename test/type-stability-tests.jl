@@ -20,11 +20,11 @@
         +(Blobs.child_size(fieldtype(T, :x), x_len))
     end
 
-    function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+    function Blobs.child_size(::Type{Bar}, b_len::Int64, c::Bool, d_len::Int64, e_len::Int64, y::Float64)
         T = Bar
         +(Blobs.child_size(fieldtype(T, :b), b_len),
         Blobs.child_size(fieldtype(T, :d), d_len),
-        Blobs.child_size(fieldtype(T, :e), x_len, y))
+        Blobs.child_size(fieldtype(T, :e), e_len, y))
     end
 
     function Blobs.init(quux::Blob{Quux}, free::Blob{Nothing}, x_len::Int64, y::Float64)
@@ -33,10 +33,10 @@
         free
     end
 
-    function Blobs.init(bar::Blob{Bar}, free::Blob{Nothing}, b_len::Int64, c::Bool, d_len::Int64, x_len::Int64, y::Float64)
+    function Blobs.init(bar::Blob{Bar}, free::Blob{Nothing}, b_len::Int64, c::Bool, d_len::Int64, e_len::Int64, y::Float64)
         free = Blobs.init(bar.b, free, b_len)
         free = Blobs.init(bar.d, free, d_len)
-        free = Blobs.init(bar.e, free, x_len, y)
+        free = Blobs.init(bar.e, free, e_len, y)
         bar.c[] = c
         free
     end

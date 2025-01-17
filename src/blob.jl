@@ -76,7 +76,7 @@ Base.@assume_effects :foldable function self_size(::Type{T}) where T
         # Recursion is the fastest way to compile this, confirmed with benchmarks.
         # Alternatives considered:
         # - +(Iterators.map(self_size, fieldtypes(T))...)
-        # - runtime_size for-loop (below).
+        # - _iterative_sum_field_sizes for-loop (below).
         # Splatting is always slower, and breaks after ~30 fields.
         # The for-loop is faster after around 15-30 fields, so we pick an
         # arbitrary cutoff of 20:
