@@ -145,7 +145,7 @@ end
 end
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
-        throw(BoundsError())
+        _throw_getindex_boundserror(blob, i)
     end
     return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
 end
