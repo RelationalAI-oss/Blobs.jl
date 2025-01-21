@@ -24,6 +24,14 @@ function Blob{T}(blob::Blob) where T
     Blob{T}(getfield(blob, :base), getfield(blob, :offset), getfield(blob, :limit))
 end
 
+function Blob{T}(blob::Blob, rel_offset::Int64) where {T}
+    Blob{T}(
+        getfield(blob, :base),
+        getfield(blob, :offset) + rel_offset,
+        getfield(blob, :limit)
+    )
+end
+
 function assert_same_allocation(blob1::Blob, blob2::Blob)
     @noinline _throw(blob1, blob2) =
         throw(AssertionError("These blobs do not share the same allocation: $blob1 - $blob2"))
@@ -45,12 +53,20 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-function boundscheck(blob::Blob{T}) where T
-    begin
-        if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
-            throw(BoundsError(blob))
-        end
-        @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
+@noinline function _throw_assert_not_null_error(typename::Symbol)
+    throw(AssertionError("Null pointer dereference in Blob{$(typename)}"))
+end
+
+@noinline function boundscheck(blob::Blob{T}) where T
+    base = getfield(blob, :base)
+    offset = getfield(blob, :offset)
+    limit = getfield(blob, :limit)
+    element_size = self_size(T)
+    if (offset < 0) || (offset + element_size > limit)
+        throw(BoundsError())
+    end
+    if base == Ptr{Nothing}(0)
+        _throw_assert_not_null_error(T.name.name)
     end
 end
 
@@ -124,9 +140,12 @@ _fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{i}) where {T,i,field} =
     Blob{FT}(blob + blob_offset(T, i))
 end
 
+@noinline function _throw_getindex_boundserror(blob::Blob, i::Int)
+    throw(BoundsError(blob, i))
+end
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
-        throw(BoundsError(blob, i))
+        _throw_getindex_boundserror(blob, i)
     end
     return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
 end
@@ -169,31 +188,19 @@ end
         unsafe_store!(pointer(blob), value)
         value
     else
-        _unsafe_store_struct!(blob, value, Val(fieldcount(T)))
+        _unsafe_store!(blob, value, Val(fieldcount(T)))
         value
     end
 end
 # On julia 1.11, this is equivalantly fast to the `@generated` version.
 # On julia 1.10, this is about 2x slower than generated for medium structs: ~10 ns vs ~5 ns.
 # We will go with the recursive version, to avoid the compilation cost.
-@inline _unsafe_store_struct!(::Blob{T}, ::T, ::Val{0}) where {T} = nothing
-function _unsafe_store_struct!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
+@inline _unsafe_store!(::Blob{T}, ::T, ::Val{0}) where {T} = nothing
+function _unsafe_store!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
     @inline
     types = fieldnames(T)
-    _unsafe_store_struct!(blob, value, Val(I-1))
+    _unsafe_store!(blob, value, Val(I-1))
     unsafe_store!(getindex(blob, types[I]), getproperty(value, types[I]))
-    nothing
-end
-# Recursive function for tuples is equivalent to unrolled via `@generated`.
-function Base.unsafe_store!(blob::Blob{T}, value::T) where {T <: Tuple}
-    _unsafe_store_tuple!(blob, value, Val(fieldcount(T)))
-    value
-end
-@inline _unsafe_store_tuple!(::Blob{T}, ::T, ::Val{0}) where {T<:Tuple} = nothing
-function _unsafe_store_tuple!(blob::Blob{T}, value::T, ::Val{I}) where {T<:Tuple, I}
-    @inline
-    _unsafe_store_struct!(blob, value, Val(I-1))
-    unsafe_store!(getindex(blob, I), value[I])
     nothing
 end
 
