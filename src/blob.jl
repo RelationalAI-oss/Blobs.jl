@@ -140,6 +140,9 @@ _fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{i}) where {T,i,field} =
     Blob{FT}(blob + blob_offset(T, i))
 end
 
+@noinline function _throw_getindex_boundserror(blob::Blob, i::Int)
+    throw(BoundsError(blob, i))
+end
 @inline function Base.getindex(blob::Blob{T}, i::Int) where {T}
     @boundscheck if i < 1 || i > fieldcount(T)
         throw(BoundsError())
