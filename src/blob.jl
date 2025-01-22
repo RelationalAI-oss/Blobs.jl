@@ -119,8 +119,21 @@ end
 
 # Recursion scales better than splatting for large numbers of fields.
 Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
-    _recursive_sum_field_sizes(T, Val(i - 1))
+    blob_offsets(T)[i]
 end
+
+Base.@assume_effects :foldable @inline function blob_offsets(::Type{T}) where {T}
+    _recursive_sum_field_offsets(T)
+end
+Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type{T}) where {T} =
+    _recursive_sum_field_offsets(T, Val(fieldcount(T)))
+Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type, ::Val{0}) = ()
+Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type, ::Val{1}) = (0,)
+Base.@assume_effects :foldable function _recursive_sum_field_offsets(::Type{T}, ::Val{i}) where {T,i}
+    tup = _recursive_sum_field_offsets(T, Val(i-1))
+    return (tup..., tup[end] + self_size(fieldtype(T, i-1)))
+end
+
 
 # Manually write a compile-time loop in the type domain, to enforce constant-folding the
 # fieldidx even for large structs (with e.g. 100 fields). This might make compiling a touch

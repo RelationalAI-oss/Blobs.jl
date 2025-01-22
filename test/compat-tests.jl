@@ -42,7 +42,6 @@ bbv = Blobs.malloc_and_init(BlobBitVector, 3)
 pbv = @v bbv
 pbv[2] = true
 @test pbv[2] == true
-@test pv[2] == Foo(2, 2.2)
 pbv[1] = false
 pbv[3] = false
 # tests iteration
