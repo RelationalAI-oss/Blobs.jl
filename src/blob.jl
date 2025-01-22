@@ -123,32 +123,42 @@ Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) w
 end
 
 Base.@assume_effects :foldable @inline function blob_offsets(::Type{T}) where {T}
-    _recursive_sum_field_offsets(T)
+    _recursive_field_offsets(T)
 end
-Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type{T}) where {T} =
-    _recursive_sum_field_offsets(T, Val(fieldcount(T)))
-Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type, ::Val{0}) = ()
-Base.@assume_effects :foldable _recursive_sum_field_offsets(::Type, ::Val{1}) = (0,)
-Base.@assume_effects :foldable function _recursive_sum_field_offsets(::Type{T}, ::Val{i}) where {T,i}
-    tup = _recursive_sum_field_offsets(T, Val(i-1))
+Base.@assume_effects :foldable _recursive_field_offsets(::Type{T}) where {T} =
+    _recursive_field_offsets(T, Val(fieldcount(T)))
+Base.@assume_effects :foldable _recursive_field_offsets(::Type, ::Val{0}) = ()
+Base.@assume_effects :foldable _recursive_field_offsets(::Type, ::Val{1}) = (0,)
+Base.@assume_effects :foldable function _recursive_field_offsets(::Type{T}, ::Val{i}) where {T,i}
+    tup = _recursive_field_offsets(T, Val(i-1))
     return (tup..., tup[end] + self_size(fieldtype(T, i-1)))
 end
 
 
 # Manually write a compile-time loop in the type domain, to enforce constant-folding the
-# fieldidx even for large structs (with e.g. 100 fields). This might make compiling a touch
-# slower, but it allows this to work for even large structs, like the manually-written
+# fieldindexes even for large structs (with e.g. 100 fields). This might make compiling a
+# touch slower, but it allows this to work for even large structs, like the manually-written
 # `@generated` functions did before.
-@inline function fieldidx(::Type{T}, ::Val{field}) where {T,field}
-    return _fieldidx_lookup(T, Val(field), Val(fieldcount(T)))
+@inline function fieldindexes(::Type{T}) where {T,field}
+    return _recursive_fieldindexes(T, Val(fieldcount(T)))
 end
-_fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{0}) where {T,field} =
-    error("$T has no field $field")
-_fieldidx_lookup(::Type{T}, ::Val{field}, ::Val{i}) where {T,i,field} =
-    fieldname(T, i) === field ? i : _fieldidx_lookup(T, Val(field), Val(i-1))
+_recursive_fieldindexes(::Type{T}, ::Val{0}) where {T,field} = ()
+function _recursive_fieldindexes(::Type{T}, ::Val{i}) where {T,i,field}
+    next = _recursive_fieldindexes(T, Val(i-1))
+    names = (fieldnames(typeof(next))..., fieldname(T, i))
+    return NamedTuple{names}((next..., i))
+end
 
+# NOTE: An important optimization here is that the static operations that can be performed
+# only on the top do not depend on the possibly runtime value `field`. We precompute the
+# fieldname => fieldidx lookup table at compile time (as a NamedTuple), then use it at
+# runtime. If the field is a known compiler constant (as in the `x.y` case), all the better.
 @inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
-    i = fieldidx(T, Val(field))
+    fieldidx_lookup = fieldindexes(T)
+    if !haskey(fieldidx_lookup, field)
+        error("$T has no field $field")
+    end
+    i = fieldindexes(T)[field]
     FT = fieldtype(T, i)
     Blob{FT}(blob + blob_offset(T, i))
 end
