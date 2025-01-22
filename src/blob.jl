@@ -139,11 +139,11 @@ end
 # fieldindexes even for large structs (with e.g. 100 fields). This might make compiling a
 # touch slower, but it allows this to work for even large structs, like the manually-written
 # `@generated` functions did before.
-@inline function fieldindexes(::Type{T}) where {T,field}
+@inline function fieldindexes(::Type{T}) where {T}
     return _recursive_fieldindexes(T, Val(fieldcount(T)))
 end
-_recursive_fieldindexes(::Type{T}, ::Val{0}) where {T,field} = ()
-function _recursive_fieldindexes(::Type{T}, ::Val{i}) where {T,i,field}
+_recursive_fieldindexes(::Type{T}, ::Val{0}) where {T} = ()
+function _recursive_fieldindexes(::Type{T}, ::Val{i}) where {T,i}
     next = _recursive_fieldindexes(T, Val(i-1))
     names = (fieldnames(typeof(next))..., fieldname(T, i))
     return NamedTuple{names}((next..., i))
