@@ -119,7 +119,16 @@ end
 
 # Recursion scales better than splatting for large numbers of fields.
 Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
-    blob_offsets(T)[i]
+    # Beyond this size, the tuple-construction in blob_offsets(T) refuses to const-fold,
+    # in the *dynamic* `i` case, so we would end up with runtime tuple
+    # construction and many many allocations.
+    # For larger structs, doing dynamic field access, we elect to have a single
+    # dynamic dispatch here with friendlier performance.
+    if fieldcount(T) <= 32
+        blob_offsets(T)[i]
+    else
+        _recursive_sum_field_sizes(T, Val(i - 1))
+    end
 end
 
 Base.@assume_effects :foldable @inline function blob_offsets(::Type{T}) where {T}
@@ -156,12 +165,13 @@ end
 @inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
     fieldidx_lookup = fieldindexes(T)
     if !haskey(fieldidx_lookup, field)
-        error("$T has no field $field")
+        _throw_missing_field_error(T, field)
     end
-    i = fieldindexes(T)[field]
+    i = fieldidx_lookup[field]
     FT = fieldtype(T, i)
     Blob{FT}(blob + blob_offset(T, i))
 end
+@noinline _throw_missing_field_error(T, field) = error("$T has no field $field")
 
 @noinline function _throw_getindex_boundserror(blob::Blob, i::Int)
     throw(BoundsError(blob, i))
