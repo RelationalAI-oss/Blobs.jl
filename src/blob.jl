@@ -12,6 +12,14 @@ struct Blob{T}
     end
 end
 
+# OPTIMIZATION: Annoyingly julia dispatches on a *Type Constructor* are very expensive.
+# So if you ever have a type unstable field access on a Blob, we will not know the type of
+# the child Blob we will return, meaning a dynamic dispatch. Dispatching on Blob{FT}(...)
+# for an unknown FT is very expensive. So instead, we dispatch to this function, which will
+# be cheap because it has only one method. Then this function calls the constructor.
+# This is a silly hack. :')
+make_blob(::Type{BT}, b::Blob, offset) where {BT} = Blob{BT}(b + offset)
+
 function Blob(ref::Base.RefValue{T}) where T
     Blob{T}(pointer_from_objref(ref), 0, sizeof(T))
 end
@@ -169,7 +177,7 @@ end
     end
     i = fieldidx_lookup[field]
     FT = fieldtype(T, i)
-    Blob{FT}(blob + blob_offset(T, i))
+    make_blob(FT, blob, blob_offset(T, i))
 end
 @noinline _throw_missing_field_error(T, field) = error("$T has no field $field")
 
@@ -180,7 +188,8 @@ end
     @boundscheck if i < 1 || i > fieldcount(T)
         _throw_getindex_boundserror(blob, i)
     end
-    return Blob{fieldtype(T, i)}(blob + Blobs.blob_offset(T, i))
+    FT = fieldtype(T, i)
+    return make_blob(FT, blob, Blobs.blob_offset(T, i))
 end
 
 Base.@propagate_inbounds function Base.setindex!(blob::Blob{T}, value::T) where T
