@@ -150,7 +150,7 @@ function _recursive_fieldindexes(::Type{T}, ::Val{i}) where {T,i}
 end
 
 # NOTE: An important optimization here is that the static operations that can be performed
-# only on the top do not depend on the possibly runtime value `field`. We precompute the
+# only on the type do not depend on the possibly runtime value `field`. We precompute the
 # fieldname => fieldidx lookup table at compile time (as a NamedTuple), then use it at
 # runtime. If the field is a known compiler constant (as in the `x.y` case), all the better.
 @inline function Base.getindex(blob::Blob{T}, field::Symbol) where {T}
