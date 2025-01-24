@@ -118,7 +118,7 @@ Base.@assume_effects :foldable function _recursive_sum_field_sizes(::Type{T}, ::
 end
 
 # Recursion scales better than splatting for large numbers of fields.
-Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) where {T}
+@inline function blob_offset(::Type{T}, i::Int) where {T}
     # Beyond this size, the tuple-construction in blob_offsets(T) refuses to const-fold,
     # in the *dynamic* `i` case, so we would end up with runtime tuple
     # construction and many many allocations.
@@ -131,14 +131,14 @@ Base.@assume_effects :foldable @inline function blob_offset(::Type{T}, i::Int) w
     end
 end
 
-Base.@assume_effects :foldable @inline function blob_offsets(::Type{T}) where {T}
+Base.@assume_effects :foldable function blob_offsets(::Type{T}) where {T}
     _recursive_field_offsets(T)
 end
-Base.@assume_effects :foldable _recursive_field_offsets(::Type{T}) where {T} =
+_recursive_field_offsets(::Type{T}) where {T} =
     _recursive_field_offsets(T, Val(fieldcount(T)))
-Base.@assume_effects :foldable _recursive_field_offsets(::Type, ::Val{0}) = ()
-Base.@assume_effects :foldable _recursive_field_offsets(::Type, ::Val{1}) = (0,)
-Base.@assume_effects :foldable function _recursive_field_offsets(::Type{T}, ::Val{i}) where {T,i}
+_recursive_field_offsets(::Type, ::Val{0}) = ()
+_recursive_field_offsets(::Type, ::Val{1}) = (0,)
+function _recursive_field_offsets(::Type{T}, ::Val{i}) where {T,i}
     tup = _recursive_field_offsets(T, Val(i-1))
     return (tup..., tup[end] + self_size(fieldtype(T, i-1)))
 end
@@ -148,7 +148,7 @@ end
 # fieldindexes even for large structs (with e.g. 100 fields). This might make compiling a
 # touch slower, but it allows this to work for even large structs, like the manually-written
 # `@generated` functions did before.
-@inline function fieldindexes(::Type{T}) where {T}
+Base.@assume_effects :foldable function fieldindexes(::Type{T}) where {T}
     return _recursive_fieldindexes(T, Val(fieldcount(T)))
 end
 _recursive_fieldindexes(::Type{T}, ::Val{0}) where {T} = ()
