@@ -1,5 +1,7 @@
 using Blobs, BenchmarkTools
 
+@info "------- Benchmark Runtimes ---------"
+
 @eval struct MixedStruct10
     $((:($(Symbol("f$i"))::Float64) for i in 1:5)...)
     $((:($(Symbol("x$i"))::Int64) for i in 1:5)...)
@@ -31,3 +33,37 @@ m100 = Blobs.malloc(MixedStruct100)
 @btime $(m100).x5[] = 0
 @btime $(m100).x50[] = 0
 
+
+@info "------- Benchmark Compile Times ---------"
+
+# Benchmark Compile Times:
+function eval_type(N)
+    S = gensym("MixedType$N")
+    @eval struct $S
+        $((:($(Symbol("f$i"))::Float64) for i in 1:(N÷2) )...)
+        $((:($(Symbol("x$i"))::Int64) for i in 1:(N÷2) )...)
+    end
+    return @eval($S)
+end
+
+for N in (10,100)
+    @info " --  N = $N -- "
+
+    @btime Blobs.malloc(S) setup=(S=eval_type($N))
+
+    @btime (Blobs.malloc(S))[] setup=(S=eval_type($N))
+
+    @btime (Blobs.malloc(S))[] = (Blobs.malloc(S)[]) setup=(S=eval_type($N))
+
+    @btime (Blobs.malloc(S)).x5[] setup=(S=eval_type($N))
+    if N >= 100
+        @btime (Blobs.malloc(S)).x50[] setup=(S=eval_type($N))
+    end
+
+    @btime (Blobs.malloc(S)).f5[] = 0 setup=(S=eval_type($N))
+    @btime (Blobs.malloc(S)).x5[] = 0 setup=(S=eval_type($N))
+    if N >= 100
+        @btime (Blobs.malloc(S)).x50[] = 0 setup=(S=eval_type($N))
+    end
+
+end
