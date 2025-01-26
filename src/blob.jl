@@ -217,8 +217,10 @@ end
     end
 end
 @inline _unsafe_load_fields(::Blob, ::Val{0}) = ()
-@inline function _unsafe_load_fields(blob::Blob{T}, ::Val{I}) where {T, I}
-    return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, I)))
+function _unsafe_load_fields(blob::Blob{T}, ::Val{I}) where {T, I}
+    @inline
+    types = fieldnames(T)
+    return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, types[I])))
 end
 # We really want to get rid of all `@generated` functions in this codebase,
 # but we were unable to produce fast, non-allocating code for
@@ -228,8 +230,8 @@ end
 @generated function _unsafe_load_many_fields(blob::Blob{T}) where {T}
     quote
         $(Expr(:meta, :inline))
-        $(Expr(:new, T, @splice I in 1:fieldcount(T) quote
-            unsafe_load(getindex(blob, $(I)))
+        $(Expr(:new, T, @splice field in fieldnames(T) quote
+            unsafe_load(getindex(blob, $(QuoteNode(field))))
         end))
     end
 end
