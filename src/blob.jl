@@ -210,12 +210,10 @@ end
 @inline function Base.unsafe_load(blob::Blob{T}) where {T}
     if isempty(fieldnames(T))
         unsafe_load(pointer(blob))
-    else
-        # This recursive definition is *almost* as fast as the `@generated` code. On julia
-        # 1.10, it has a single invoke function call here, which adds a few ns overhead.
-        # But on julia 1.11, this generates the expected code and is just as fast.
-        # We are sticking with this version though, to save the `@generated` compilation time.
+    elseif fieldcount(T) <= 32
         @_make_new(T, _unsafe_load_fields(blob, Val(fieldcount(T))))
+    else
+        _unsafe_load_many_fields(blob)
     end
 end
 @inline _unsafe_load_fields(::Blob, ::Val{0}) = ()
@@ -223,6 +221,19 @@ function _unsafe_load_fields(blob::Blob{T}, ::Val{I}) where {T, I}
     @inline
     types = fieldnames(T)
     return (_unsafe_load_fields(blob, Val(I-1))..., unsafe_load(getindex(blob, types[I])))
+end
+# We really want to get rid of all `@generated` functions in this codebase,
+# but we were unable to produce fast, non-allocating code for
+# `unsafe_load(::Blob{T})` where fieldcount(T) > 32. So we use this
+# fallback for the case of many fields. As far as I can tell, this
+# is not reached for <= 32 fields.
+@generated function _unsafe_load_many_fields(blob::Blob{T}) where {T}
+    quote
+        $(Expr(:meta, :inline))
+        $(Expr(:new, T, @splice field in fieldnames(T) quote
+            unsafe_load(getindex(blob, $(QuoteNode(field))))
+        end))
+    end
 end
 
 @inline function Base.unsafe_store!(blob::Blob{T}, value::T) where {T}
@@ -234,9 +245,6 @@ end
         value
     end
 end
-# On julia 1.11, this is equivalantly fast to the `@generated` version.
-# On julia 1.10, this is about 2x slower than generated for medium structs: ~10 ns vs ~5 ns.
-# We will go with the recursive version, to avoid the compilation cost.
 @inline _unsafe_store!(::Blob{T}, ::T, ::Val{0}) where {T} = nothing
 function _unsafe_store!(blob::Blob{T}, value::T, ::Val{I}) where {T, I}
     @inline
