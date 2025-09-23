@@ -1,5 +1,5 @@
 "A fixed-length vector whose data is stored in a Blob."
-struct BlobVector{T} <: AbstractArray{T, 1}
+struct BlobVector{T} <: DenseArray{T, 1}
     data::Blob{T}
     length::Int64
 end
