@@ -33,6 +33,11 @@ m100 = Blobs.malloc(MixedStruct100)
 @btime $(m100).x5[] = 0
 @btime $(m100).x50[] = 0
 
+let data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3),
+    bv = BlobVector{Int64}(data, 4)
+
+    @btime (view($bv, $(2:3)))[$1]
+end
 
 @info "------- Benchmark Compile Times ---------"
 

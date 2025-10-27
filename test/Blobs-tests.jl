@@ -66,6 +66,18 @@ if Base.JLOptions().check_bounds == 0
     f2(bv)
 end
 
+# view
+bv[1] = 101
+bv[2] = 102
+bv[3] = 103
+@test view(bv, 1:3) == [101,102,103]
+@test getfield(view(bv, 1:3).data, :base) == getfield(bv.data, :base)
+@test view(bv, 1:3) != [101,102,103,104]
+@test view(bv, 1:3) != [101,102]
+@test view(bv, 2:3) == [102,103]
+@test view(bv, 3:3) == [103]
+@test view(bv, 4:3) == []
+
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = bbv[]
 bv[2] = Foo(2, 2.2)
