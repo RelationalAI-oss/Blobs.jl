@@ -41,13 +41,29 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
+@eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = false
+
+function enable_boundscheck_on_deref()
+    if !Base.invokelatest(BOUNDSCHECK_ON_DEREF_ENABLED)
+        @eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = true
+    end
+end
+
+function disable_boundscheck_on_deref()
+    if Base.invokelatest(BOUNDSCHECK_ON_DEREF_ENABLED)
+        @eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = false
+    end
+end
+
 @inline function boundscheck(blob::Blob{T}) where T
+    BOUNDSCHECK_ON_DEREF_ENABLED() || return nothing
     @boundscheck begin
         if (getfield(blob, :offset) < 0) || (getfield(blob, :offset) + self_size(T) > getfield(blob, :limit))
             throw(BoundsError(blob))
         end
         @assert (getfield(blob, :base) != Ptr{Nothing}(0)) "Null pointer dereference in $(typeof(blob))"
     end
+    return nothing
 end
 
 Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T

@@ -10,6 +10,9 @@ end
 
 # Blob
 
+blobs_boundscheck_on_deref_was_disabled = !Blobs.BOUNDSCHECK_ON_DEREF_ENABLED()
+Blobs.enable_boundscheck_on_deref()
+
 blob = Blob{Int64}(Libc.malloc(16), 0, 8)
 @test_nowarn blob[]
 @test_throws BoundsError (blob+1)[]
@@ -18,6 +21,10 @@ if Base.JLOptions().check_bounds == 0
     f1(blob) = @inbounds (blob+1)[]
     f1(blob)
 end
+
+Blobs.disable_boundscheck_on_deref()
+@test_nowarn (blob+1)[]
+Blobs.enable_boundscheck_on_deref()
 
 foo = Blobs.malloc_and_init(Foo)
 foo.x[] = 1
@@ -332,5 +339,9 @@ bt[] = (Toto{1}((0x0,), 8),)
 @test_throws ErrorException Blobs.malloc_and_init(String)
 
 include("compat-tests.jl")
+
+if blobs_boundscheck_on_deref_was_disabled
+    Blobs.disable_boundscheck_on_deref()
+end
 
 end
