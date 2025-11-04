@@ -1,5 +1,5 @@
 "A fixed-length vector whose data is stored in a Blob."
-struct BlobVector{T} <: AbstractArray{T, 1}
+struct BlobVector{T} <: DenseArray{T, 1}
     data::Blob{T}
     length::Int64
 end
@@ -45,6 +45,20 @@ end
 
 Base.@propagate_inbounds function Base.setindex!(blob::BlobVector{T}, v, i::Int)::T where T
     get_address(blob, i)[] = v
+end
+
+# For view, we don't need to make a `SubArray`, we can just make another Blob
+Base.@propagate_inbounds function Base.view(bv::BlobVector{T}, range) where T
+    @boundscheck checkbounds(bv, range)
+    blob = bv.data
+    return BlobVector{T}(
+        Blob{T}(
+            getfield(blob, :base) + (first(range)-1)*sizeof(T),
+            getfield(blob, :offset),
+            getfield(blob, :limit) - (first(range)-1)*sizeof(T),
+        ),
+        length(range),
+    )
 end
 
 # copying, with correct handling of overlapping regions
