@@ -61,22 +61,8 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-@eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = false
-
-function enable_boundscheck_on_deref()
-    if !Base.invokelatest(BOUNDSCHECK_ON_DEREF_ENABLED)
-        @eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = true
-    end
-end
-
-function disable_boundscheck_on_deref()
-    if Base.invokelatest(BOUNDSCHECK_ON_DEREF_ENABLED)
-        @eval @inline BOUNDSCHECK_ON_DEREF_ENABLED() = false
-    end
-end
-
 @inline function boundscheck(blob::Blob)
-    if Base.invokelatest(BOUNDSCHECK_ON_DEREF_ENABLED)
+    @static if BOUNDSCHECK_ON_DEREF_ENABLED
         boundscheck_impl(blob)
     end
     return nothing

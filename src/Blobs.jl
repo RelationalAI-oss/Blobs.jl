@@ -1,6 +1,9 @@
 module Blobs
 
 using MacroTools
+using Preferences: @load_preference
+
+const BOUNDSCHECK_ON_DEREF_ENABLED::Bool = @load_preference("BLOBS_BOUNDSCHECK_ON_DEREF_ENABLED", false)
 
 macro splice(iterator, body)
   @assert iterator.head == :call

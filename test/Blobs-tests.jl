@@ -5,6 +5,14 @@ module TestBlobs
 using Blobs
 using Test
 
+macro test_boundscheck_if_enabled(expr)
+    if Blobs.BOUNDSCHECK_ON_DEREF_ENABLED
+        return :( @test_throws BoundsError $(esc(expr)) )
+    else
+        return :( @test_nowarn $(esc(expr)) )
+    end
+end
+
 struct Foo
     x::Int64
     y::Float32 # tests conversion and alignment
@@ -12,21 +20,14 @@ end
 
 # Blob
 
-was_bloundscheck_on_deref_enabled = Blobs.BOUNDSCHECK_ON_DEREF_ENABLED()
-Blobs.enable_boundscheck_on_deref()
-
 blob = Blob{Int64}(Libc.malloc(16), 0, 8)
 @test_nowarn blob[]
-@test_throws BoundsError (blob+1)[]
+@test_boundscheck_if_enabled (blob+1)[]
 if Base.JLOptions().check_bounds == 0
     # @inbounds only kicks in if compiled
     f1(blob) = @inbounds (blob+1)[]
     f1(blob)
 end
-
-Blobs.disable_boundscheck_on_deref()
-@test_nowarn (blob+1)[]
-Blobs.enable_boundscheck_on_deref()
 
 foo = Blobs.malloc_and_init(Foo)
 foo.x[] = 1
@@ -67,7 +68,7 @@ foo.x[] = 1
 data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
 bv = BlobVector{Int64}(data, 4)
 @test_nowarn bv[3]
-@test_throws BoundsError bv[4]
+@test_boundscheck_if_enabled bv[4]
 if Base.JLOptions().check_bounds == 0
     f2(bv) = @inbounds bv[4]
     f2(bv)
@@ -142,7 +143,7 @@ copy!(bv3, 1, bv3, 2, 4)
 data = Blob{UInt64}(Libc.malloc(sizeof(UInt64)*4), 0, sizeof(UInt64)*3)
 bv = BlobBitVector(data, 64*4)
 @test_nowarn bv[64*3]
-@test_throws BoundsError bv[64*3 + 1]
+@test_boundscheck_if_enabled (bv[64*3 + 1])
 if Base.JLOptions().check_bounds == 0
     f3(bv) = @inbounds bv[64*3 + 1]
     f3(bv)
@@ -193,7 +194,7 @@ bv2[] = true
 data = Blob{UInt8}(Libc.malloc(8), 0, 8)
 @test_nowarn BlobString(data, 8)[8]
 # pretty much any access to a unicode string touches beginning and end
-@test_throws BoundsError BlobString(data, 16)[8]
+@test_boundscheck_if_enabled (BlobString(data, 16)[8])
 # @inbounds doesn't work for strings - too much work to propagate
 
 # test strings and unicode
@@ -351,10 +352,6 @@ bt[] = (Toto{1}((0x0,), 8),)
 
 # Non-isbitstype types are not supported
 @test_throws ErrorException Blobs.malloc_and_init(String)
-
-if !was_bloundscheck_on_deref_enabled
-    Blobs.disable_boundscheck_on_deref()
-end
 
 end
 
