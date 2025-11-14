@@ -61,11 +61,14 @@ function Base.:-(blob1::Blob, blob2::Blob)
     getfield(blob1, :offset) - getfield(blob2, :offset)
 end
 
-@noinline function _throw_assert_not_null_error(typename::Symbol)
-    throw(AssertionError("Null pointer dereference in Blob{$(typename)}"))
+@inline function boundscheck(blob::Blob)
+    @static if BOUNDSCHECK_ON_DEREF_ENABLED
+        boundscheck_impl(blob)
+    end
+    return nothing
 end
 
-@noinline function boundscheck(blob::Blob{T}) where T
+@noinline function boundscheck_impl(blob::Blob{T}) where T
     base = getfield(blob, :base)
     offset = getfield(blob, :offset)
     limit = getfield(blob, :limit)
@@ -76,6 +79,11 @@ end
     if base == Ptr{Nothing}(0)
         _throw_assert_not_null_error(T.name.name)
     end
+    return nothing
+end
+
+@noinline function _throw_assert_not_null_error(typename::Symbol)
+    throw(AssertionError("Null pointer dereference in Blob{$(typename)}"))
 end
 
 Base.@propagate_inbounds function Base.getindex(blob::Blob{T}) where T
