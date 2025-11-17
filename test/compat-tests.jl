@@ -172,4 +172,16 @@ quux = @v bar.e
 @test length(@v quux.x) == 15
 @test (@v quux.y) == 1.5
 
+data = Blob{Int64}(Libc.malloc(sizeof(Int64) * 4), 0, sizeof(Int64) * 3)
+bv = BlobVector{Int64}(data, 3)
+bv[1]=42
+bv[2]=43
+bv[3]=44
+@test bv == [42,43,44]
+for lo in 1:4
+    for hi in 0:3
+        @test @view(bv[lo:hi]) == @view([42,43,44][lo:hi])
+    end
+end
+
 end
