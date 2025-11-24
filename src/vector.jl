@@ -50,15 +50,7 @@ end
 # For view, we don't need to make a `SubArray`, we can just make another Blob
 Base.@propagate_inbounds function Base.view(bv::BlobVector{T}, range) where T
     @boundscheck checkbounds(bv, range)
-    blob = bv.data
-    return BlobVector{T}(
-        Blob{T}(
-            getfield(blob, :base) + (first(range)-1)*sizeof(T),
-            getfield(blob, :offset),
-            getfield(blob, :limit) - (first(range)-1)*sizeof(T),
-        ),
-        length(range),
-    )
+    return BlobVector{T}(pointer(bv, first(range)), length(range))
 end
 
 # copying, with correct handling of overlapping regions
