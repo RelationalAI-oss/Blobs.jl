@@ -86,7 +86,6 @@ bv[3] = 103
 @test view(bv, 2:3) == [102,103]
 @test view(bv, 3:3) == [103]
 @test view(bv, 4:3) == []
-@info bv
 for lo in 1:4
     for hi in 0:3
         @test @view(bv[lo:hi]) == @view([101,102,103][lo:hi])
