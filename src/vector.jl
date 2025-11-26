@@ -4,8 +4,9 @@ struct BlobVector{T} <: DenseArray{T, 1}
     length::Int64
 end
 
-function Base.pointer(bv::BlobVector{T}, i::Integer=1) where {T}
-    return get_address(bv, i)
+function Base.pointer(blob::BlobVector{T}, i::Integer=1) where {T}
+    # `pointer` is unsafe, and doesn't do a bounds check.
+    return blob.data + (i-1)*self_size(T)
 end
 
 Base.@propagate_inbounds function get_address(blob::BlobVector{T}, i::Int)::Blob{T} where T
@@ -50,15 +51,7 @@ end
 # For view, we don't need to make a `SubArray`, we can just make another Blob
 Base.@propagate_inbounds function Base.view(bv::BlobVector{T}, range) where T
     @boundscheck checkbounds(bv, range)
-    blob = bv.data
-    return BlobVector{T}(
-        Blob{T}(
-            getfield(blob, :base) + (first(range)-1)*sizeof(T),
-            getfield(blob, :offset),
-            getfield(blob, :limit) - (first(range)-1)*sizeof(T),
-        ),
-        length(range),
-    )
+    return BlobVector{T}(pointer(bv, first(range)), length(range))
 end
 
 # copying, with correct handling of overlapping regions

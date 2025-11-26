@@ -75,6 +75,7 @@ if Base.JLOptions().check_bounds == 0
 end
 
 # view
+bv = BlobVector{Int64}(data, 3)
 bv[1] = 101
 bv[2] = 102
 bv[3] = 103
@@ -85,6 +86,11 @@ bv[3] = 103
 @test view(bv, 2:3) == [102,103]
 @test view(bv, 3:3) == [103]
 @test view(bv, 4:3) == []
+for lo in 1:4
+    for hi in 0:3
+        @test @view(bv[lo:hi]) == @view([101,102,103][lo:hi])
+    end
+end
 
 bbv = Blobs.malloc_and_init(BlobVector{Foo}, 3)
 bv = bbv[]
