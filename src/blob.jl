@@ -99,8 +99,8 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-Base.@assume_effects  function self_size(::Type{T}) where T
-    # This function is marked  to encourage constant folding for this types-only
+Base.@assume_effects :foldable function self_size(::Type{T}) where T
+    # This function is marked :foldable to encourage constant folding for this types-only
     # static computation.
     @assert isconcretetype(T)
 
