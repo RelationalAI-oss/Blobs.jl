@@ -99,9 +99,11 @@ The number of bytes needed to allocate `T` itself.
 
 Defaults to `sizeof(T)`.
 """
-Base.@assume_effects :foldable function self_size(::Type{T}) where T
-    # This function is marked :foldable to encourage constant folding for this types-only
+Base.@assume_effects  function self_size(::Type{T}) where T
+    # This function is marked  to encourage constant folding for this types-only
     # static computation.
+    @assert isconcretetype(T)
+
     if isempty(fieldnames(T))
         sizeof(T)
     else
@@ -130,6 +132,7 @@ Base.@assume_effects :foldable _recursive_sum_field_sizes(::Type{T}) where {T} =
     _recursive_sum_field_sizes(T, Val(fieldcount(T)))
 Base.@assume_effects :foldable _recursive_sum_field_sizes(::Type, ::Val{0}) = 0
 Base.@assume_effects :foldable function _recursive_sum_field_sizes(::Type{T}, ::Val{i}) where {T,i}
+    @assert isconcretetype(T)
     return self_size(fieldtype(T, i)) + _recursive_sum_field_sizes(T, Val(i-1))
 end
 
@@ -148,6 +151,7 @@ end
 end
 
 Base.@assume_effects :foldable function blob_offsets(::Type{T}) where {T}
+    @assert isconcretetype(T)
     _recursive_field_offsets(T)
 end
 _recursive_field_offsets(::Type{T}) where {T} =
@@ -165,6 +169,7 @@ end
 # touch slower, but it allows this to work for even large structs, like the manually-written
 # `@generated` functions did before.
 Base.@assume_effects :foldable function fieldindexes(::Type{T}) where {T}
+    @assert isconcretetype(T)
     return _recursive_fieldindexes(T, Val(fieldcount(T)))
 end
 _recursive_fieldindexes(::Type{T}, ::Val{0}) where {T} = ()
